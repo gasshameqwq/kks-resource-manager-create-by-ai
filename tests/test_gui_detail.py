@@ -32,9 +32,12 @@ from core.thumbnails import (  # noqa: E402
 from tests.builders import write_card  # noqa: E402
 from ui.browser_panel import BrowserPanel  # noqa: E402
 from ui.detail_panel import (  # noqa: E402
+    LABEL_BYTE_DUPLICATE_COUNT,
+    LABEL_CONTENT_HASH,
     EMPTY_TEXT,
     DetailPanel,
     format_file_size,
+    format_sha256,
     format_timestamp,
 )
 from ui.main_window import MainWindow  # noqa: E402
@@ -108,12 +111,13 @@ def _add_resource(
     metadata_json: str | None = None,
     needs_review: int = 0,
     parse_status: str = "ok",
+    sha256: str | None = None,
 ) -> None:
     conn.execute(
         "INSERT INTO resources(id, resource_type, name, display_name, file_path,"
         " file_path_key, relative_path, extension, card_marker, file_size,"
         " modified_time, library_id, scan_status, parse_status, needs_review,"
-        " metadata_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " metadata_json, sha256) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             resource_id,
             resource_type,
@@ -131,6 +135,7 @@ def _add_resource(
             parse_status,
             needs_review,
             metadata_json,
+            sha256,
         ),
     )
 
@@ -670,3 +675,134 @@ def test_missing_marked_from_dto_not_recomputed() -> None:
     assert " LEFT JOIN" not in upper and " INNER JOIN" not in upper
     assert "SELECT " not in upper
     assert "mod_id IS NULL" not in source
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.3-C：GUI Surfacing（内容哈希 + byte-duplicate 只读展示）
+# ---------------------------------------------------------------------------
+
+
+_HASH_A = "a" * 64
+_HASH_B = "b" * 64
+
+
+@pytest.fixture()
+def surfaced(conn, assets):
+    """资源 10/11 字节完全相同（同一 sha256）；12 唯一；13 无哈希（NULL）。"""
+    _add_resource(
+        conn, 10, name="DupA", path=assets["good"], sha256=_HASH_A
+    )
+    _add_resource(
+        conn, 11, name="DupB", path=assets["good"].parent / "dupB.png",
+        sha256=_HASH_A,
+    )
+    _add_resource(
+        conn, 12, name="Unique", path=assets["good"].parent / "unique.png",
+        sha256=_HASH_B,
+    )
+    _add_resource(
+        conn, 13, name="NoHash", path=assets["good"].parent / "nohash.png",
+        sha256=None,
+    )
+    return conn
+
+
+@pytest.fixture()
+def surfaced_window(qapp, surfaced, preview_service):
+    w = MainWindow(BrowseService(surfaced), preview_service)
+    yield w
+    w.close()
+
+
+def test_format_sha256_truncates_and_handles_none() -> None:
+    assert format_sha256(None) == "-"
+    assert format_sha256("") == "-"
+    assert format_sha256("abc") == "abc"
+    assert format_sha256(_HASH_A) == "aaaaaaaaaaaa…"
+    assert _HASH_A.startswith(format_sha256(_HASH_A).rstrip("…"))
+
+
+def test_detail_shows_content_hash_truncated_with_full_tooltip(surfaced_window) -> None:
+    """sha256 有值：Basic 区显示截断值，tooltip 为完整 64 位。"""
+    _select(surfaced_window, 10)
+    panel = surfaced_window.detail_panel
+    basic = panel.basic_rows()
+    assert basic[LABEL_CONTENT_HASH] == "aaaaaaaaaaaa…"
+    assert panel.basic_row_tooltips()[LABEL_CONTENT_HASH] == _HASH_A
+
+
+def test_detail_content_hash_matches_resource_summary(surfaced_window) -> None:
+    """展示值来自 ResourceSummary.sha256（GUI 不自己算哈希）。"""
+    service = surfaced_window._service  # noqa: SLF001 - 直接核对数据来源
+    summary = service.detail(10).resource
+    assert summary.sha256 == _HASH_A
+    _select(surfaced_window, 10)
+    assert (
+        surfaced_window.detail_panel.basic_rows()[LABEL_CONTENT_HASH]
+        == format_sha256(summary.sha256)
+    )
+
+
+def test_detail_none_sha256_does_not_fake_hash(surfaced_window) -> None:
+    """sha256 为 NULL：显示 ``-``，且不产生内容哈希 tooltip。"""
+    _select(surfaced_window, 13)
+    panel = surfaced_window.detail_panel
+    assert panel.basic_rows()[LABEL_CONTENT_HASH] == "-"
+    assert LABEL_CONTENT_HASH not in panel.basic_row_tooltips()
+
+
+def test_detail_byte_duplicate_count_for_members(surfaced_window) -> None:
+    """重复组成员：两个成员从各自详情进入都显示相同的组大小（2）。"""
+    for rid in (10, 11):
+        _select(surfaced_window, rid)
+        panel = surfaced_window.detail_panel
+        assert panel.basic_rows()[LABEL_BYTE_DUPLICATE_COUNT] == "2"
+        assert "字节完全相同" in panel.basic_row_tooltips()[LABEL_BYTE_DUPLICATE_COUNT]
+
+
+def test_detail_non_duplicate_shows_one(surfaced_window) -> None:
+    """唯一 sha256 的资源：计数为 1，且不暗示存在重复。"""
+    _select(surfaced_window, 12)
+    panel = surfaced_window.detail_panel
+    assert panel.basic_rows()[LABEL_BYTE_DUPLICATE_COUNT] == "1"
+    assert "没有其它" in panel.basic_row_tooltips()[LABEL_BYTE_DUPLICATE_COUNT]
+
+
+def test_detail_null_sha256_is_not_a_duplicate(surfaced_window) -> None:
+    """``sha256 IS NULL`` 不参与重复判定（计数为 1）。"""
+    _select(surfaced_window, 13)
+    panel = surfaced_window.detail_panel
+    assert panel.basic_rows()[LABEL_BYTE_DUPLICATE_COUNT] == "1"
+
+
+def test_detail_duplicate_info_does_not_write_database(surfaced_window) -> None:
+    """展示 sha256 / duplicate 信息不产生任何数据库写入。"""
+    conn = surfaced_window._service.conn
+    before_changes = conn.total_changes
+    for rid in (10, 11, 12, 13):
+        _select(surfaced_window, rid)
+    assert conn.total_changes == before_changes
+
+
+def test_gui_has_no_sql_and_no_query_layer_access() -> None:
+    """架构约束（静态）：ui/detail_panel.py 与 ui/main_window.py 不越界。"""
+    ui_dir = Path(__file__).resolve().parent.parent / "ui"
+    for name in ("detail_panel.py", "main_window.py"):
+        source = (ui_dir / name).read_text(encoding="utf-8")
+        upper = source.upper()
+        assert "SELECT " not in upper and "GROUP BY" not in upper, name
+        assert "hashlib" not in source, name
+        import_lines = [
+            line
+            for line in source.splitlines()
+            if line.startswith("import ") or line.startswith("from ")
+        ]
+        joined = "\n".join(import_lines)
+        for forbidden in (
+            "sqlite3",
+            "ResourceQuery",
+            "LibraryQuery",
+            "quick_hash",
+            "content_key",
+        ):
+            assert forbidden not in joined, f"{name} 不得 import {forbidden}"

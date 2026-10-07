@@ -5,9 +5,10 @@
 > 权威契约：`docs/phase2/PHASE2_0_C_ARCHITECTURE_DESIGN.md`（§5.4 / §5.5 / §8 / §13.7 / §14 / §15 / §16 / §18.1）
 > 前序基线：`docs/phase2/PHASE2_2_CLOSURE_REPORT.md`（Phase 2.2 = CLOSED / PASS）
 > 阶段定义（2.0-C §16）：**Phase 2.3 = Query / CLI / GUI Surfacing**
-> 状态：**只读审查完成 → 用户确认范围 → Phase 2.3-A 实施完成并通过验证**；
-> 已实现 Query / DTO Surfacing 与 BrowseService 只读转发；未进入 2.3-B（CLI）/ 2.3-C（GUI）/
-> 2.3-D（FilterBar）；未创建 Phase 2.3 Closure Report。
+> 状态：**只读审查完成 → 用户确认范围 → 2.3-A / 2.3-B / 2.3-C 依次实施并提交**；
+> 已实现 Query / DTO Surfacing（含 BrowseService 只读转发）、CLI Surfacing、GUI Surfacing
+> （详情面板只读展示内容哈希与 byte-duplicate）；
+> 未进入 2.3-D（FilterBar）；未创建 Phase 2.3 Closure Report。
 
 ---
 
@@ -16,6 +17,10 @@
 记录进入 Phase 2.3 之前的**只读架构审查与实施规划**结论，供下一步
 （确认范围 → 冻结决策 → 实现 → 验证 → 收尾）参考。
 本文件**不改变**任何 Phase 1 / 2.0 / 2.1 / 2.2 已封存文档的结论，也不构成新的契约。
+
+**维护约定（2026-10-07 起）**：本日志按「每一步实施后追加记录」维护。
+本次对话后续的**每一步**（每个子阶段的实施、验证、Git 收尾，以及其它经用户确认的动作）
+都会追加到本文件（见 §14），记录范围冻结、变更清单、关键决策、验证证据与 Git 状态。
 
 ---
 
@@ -281,14 +286,14 @@ GUI 未绕过 `BrowseService`；CLI JSON 向后兼容；真实样本只读不变
 
 ```text
 Phase 2.3 只读审查 + 架构评审 + 实施规划：完成
-Phase 2.3-A（Query / DTO Surfacing + BrowseService 只读转发）：**实施完成，验证通过**
-Phase 2.3-B（CLI Surfacing）：未开始（本次明确排除）
-Phase 2.3-C（GUI Surfacing）：未开始（本次明确排除）
+Phase 2.3-A（Query / DTO Surfacing + BrowseService 只读转发）：**实施完成，验证通过，已提交**（10f2b79）
+Phase 2.3-B（CLI Surfacing）：**实施完成，验证通过，已提交**（1b595e6）
+Phase 2.3-C（GUI Surfacing）：**实施完成，验证通过，已提交**（见 §15）
 Phase 2.3-D（FilterBar duplicate filter，可选）：未开始（本次明确排除）
 Phase 2.3 Closure Report：未创建（按要求不创建）
-schema / migration / 数据库 / CLI / GUI：未修改
+schema / migration / 数据库：未修改
 scanner / parser / hashing / store：未修改
-Git：未提交、未打 tag
+Git：2.3-A / 2.3-B / 2.3-C 各自独立提交；未打 Phase 2.3 总阶段 tag
 Phase 2.4 Final Audit：未开始
 ```
 
@@ -419,3 +424,208 @@ Phase 2.3 Closure Report：未创建
 ```
 
 > 本日志不构成 Phase 2.3 的正式 closure；2.3 整体收尾属后续阶段。
+
+---
+
+## 13. 实施记录（Phase 2.3-B — CLI Surfacing）
+
+> 范围：本次**只执行 Phase 2.3-B**。2.3-C（GUI）/ 2.3-D（FilterBar）未实现，
+> 也未创建 Phase 2.3 Closure Report。**未修改 `main.py`**（见 §13.4）。
+
+### 13.1 用户冻结的执行边界（本次）
+
+- 只做 2.3-B（CLI Surfacing）；不进入 2.3-C（GUI）/ 2.3-D（FilterBar）；
+- 允许修改：`cli_query.py` + CLI 直接相关测试；
+- 禁止修改：`core/database/*`、`core/scanner/*`、`core/parsers/*`、`core/library/*`、
+  `core/duplicate/*`、`core/classification/*`、`ui/*`、`main.py`、
+  以及 `ResourceQuery.duplicates()` 语义 / `DuplicateGroup` / 2.3-A 的 Query-DTO 实现；
+- 不重算 sha256、不加 hash 逻辑、不加数据库写入、不加 duplicate 持久化、
+  不引入 semantic / perceptual / same-character duplicate；
+- 用户可见文案必须表达为「字节完全相同」，禁止暗示同一资源 / 同一角色。
+
+### 13.2 变更清单
+
+| 文件 | 类型 | 统计 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `cli_query.py` | 修改 | +56 | 新增 `query duplicates`（人类可读 + `--json`）；`_resource_obj` 增 `sha256` 键；新增 `_duplicate_group_obj()` / `_duplicate_group_lines()`；注册 handler 与 parser；模块 docstring 补语义边界 |
+| `tests/test_query_cli.py` | 修改 | +180 | 新增 `cli_dup` 夹具 + 10 个用例；把 `query duplicates` 纳入两个既有「只读不改库」循环 |
+
+`git diff --stat`：`2 files changed, 236 insertions(+), 0 deletions(-)`。
+
+**明确未修改**：`core/query/*`（2.3-A 成果零改动）、`core/database/*`、`core/scanner/*`、
+`core/parsers/*`、`core/library/*`、`core/duplicate/*`、`core/classification/*`、
+`ui/*`、`main.py`、`docs/*`、既有 Phase 1 / 2.1 / 2.2 测试与报告。
+
+### 13.3 新增 CLI 命令 / 参数
+
+```text
+python main.py query duplicates            # 人类可读
+python main.py query duplicates --json     # 稳定 JSON
+```
+
+- 无位置参数 / 无额外选项；复用既有全局 `--json`（`parents=[common]`）。
+- 数据唯一来源 = `ResourceQuery.duplicates()`；CLI 不拼 SQL、不重新 `GROUP BY`、不算哈希。
+- 不提供 canonical / primary / status / dismiss 等概念。
+- 人类可读输出：`Byte-duplicate groups: N` + 每组 `sha256 … members=N（以下资源文件字节完全相同）`
+  + 每个成员沿用 `_resource_line()`（id / 类型 / 格式 / 标题 / 计数）并附 `file_path`。
+- 无重复时沿用既有约定输出 `(no results)`，退出码 0。
+
+JSON（`query duplicates --json`，沿既有 `{count, <list>}` 命名风格）：
+
+```json
+{
+  "count": 1,
+  "groups": [
+    {
+      "sha256": "<64 位小写十六进制>",
+      "member_count": 2,
+      "resources": [ { "id": 21, "...": "（既有全部资源字段 + sha256）" } ]
+    }
+  ]
+}
+```
+
+`query resource --json` / `query resources --json`：每个资源对象**新增** `"sha256"`（或 `null`）。
+
+### 13.4 关键实现决定
+
+1. **JSON 形态用 `{"count": N, "groups": [...]}`**（而非顶层裸数组）：用户建议的组内字段
+   `sha256 / member_count / resources` 全采纳，但外层沿用现有 CLI 的 `{count, <list>}` 风格
+   （如 `{"count":..,"mods":[..]}`），以满足「字段命名优先遵循现有 `cli_query.py` 风格」。
+2. **CLI 直接复用 `ResourceQuery.duplicates()`，未引入 `BrowseService`**：CLI 的既有约定是
+   「CLI → Query Layer → DTO」薄适配层（模块 docstring 明写），其余 19 个 handler 亦然；
+   `BrowseService` 是 GUI 编排入口。此选择避免在 CLI 新增编排层 / 连接管理，未重设计 Query Layer。
+3. **未修改 `main.py`**：`duplicates` 子命令通过既有的 `add_query_parser(sub)` 在 `cli_query.py` 内注册。
+4. **`_resource_obj` 的 sha256 为共享新增**：`sha256` 同时出现在所有使用该 helper 的命令
+   （`resource` / `resources` / `resource-mods` / `resource-plugins` / `resource-authors` /
+   `author-resources` / `plugin-resources` / `mod-resources` 及 `duplicates` 成员）——均为 additive。
+5. **人类可读输出沿用既有 `_resource_line()` 习惯**，仅额外补一行 `file_path`，不改变既有命令布局。
+
+### 13.5 测试（`tests/test_query_cli.py`，CLI focused）
+
+新增 10 例：`test_query_duplicates_default_output`、`test_query_duplicates_json_shape`、
+`test_query_duplicates_matches_query_layer_dto`、`test_query_duplicates_members_are_byte_identical`、
+`test_query_duplicates_empty_when_no_duplicates`、`test_query_duplicates_excludes_null_sha256`、
+`test_query_resource_json_includes_sha256`、`test_query_resources_json_includes_sha256`、
+`test_query_duplicates_does_not_modify_database`、`test_cli_has_no_sql_and_no_sqlite_access`（静态）。
+另把 `["query", "duplicates"]` 纳入 `test_cli_does_not_modify_database` 与
+`test_sample_cli_does_not_modify_database` 两个只读循环。
+
+### 13.6 验证证据
+
+| 检查 | 命令 | 结果 |
+| :--- | :--- | :--- |
+| focused | `.venv\Scripts\python.exe -m pytest tests/test_query_cli.py -q` | **28 passed**（原 18 + 新增 10） |
+| 全量回归 | `.venv\Scripts\python.exe -m pytest -q` | **725 passed / 0 failed**（≈49 s；715 + 10） |
+| Schema | `node tools/validate_schema.mjs` | 16 表 / 全 OK / **exit 0** |
+| Model sync | `node tools/check_model_sync.mjs` | schema ↔ models 一致 / **exit 0** |
+| 越界检查 | `git diff --name-only -- core core/database ... ui main.py docs` | **空** |
+| 无 SQL / 无 sqlite3 | `rg` 静态检查 + focused 用例 | `cli_query.py` 无 `sqlite3` / 无 SQL 关键字 |
+| 无 deprecated 字段 | `rg "quick_hash\|content_key" cli_query.py` | 无引用 |
+| 真实样本冒烟 | 真实样本 `library add` + `scan` + `query duplicates` | 恰好 1 组（Kugisaki Nobara ×2，`ee44ba20…`，members=2） |
+| schema 冻结 | `SCHEMA_VERSION == 2` / `MIGRATIONS == {1,2}` / 16 表 | 成立 |
+| duplicate 零写入 | `duplicate_groups` / `duplicate_members` | 仍零写入（无写入者；有测试守门） |
+
+### 13.7 Git 状态
+
+```text
+commit 1b595e6aa47090c972256e205ac931b2945e73d2
+short  1b595e6
+msg    feat(cli): expose byte-duplicate query
+parent 10f2b79（Phase 2.3-A）
+files  M cli_query.py · M tests/test_query_cli.py（2 files changed, 236 insertions）
+status clean（提交后工作区无改动）
+tag    未创建（无 phase-2.3-closed）
+```
+
+---
+
+## 14. 日志维护约定
+
+1. 本次对话**后续每一步**（子阶段实施、验证、Git 收尾，以及其它经用户确认的动作）
+   都追加到本文件，不新建平行日志。
+2. 每条记录固定包含：范围冻结 / 变更清单 / 关键决策 / 测试与验证证据 / Git 状态。
+3. 本文件始终是**过程日志**：不构成冻结契约，也不代替任何正式 Phase Closure Report。
+4. 记录只陈述实际执行与实测结果；未执行的检查明确标注「未执行」。
+
+---
+
+## 15. 实施记录（Phase 2.3-C — GUI Surfacing）
+
+> 范围：本次**只执行 Phase 2.3-C**。未实现 2.3-D（FilterBar「只看重复项」）；
+> 未创建 Phase 2.3 Closure Report；未打 `phase-2.3-closed` tag。
+
+### 15.1 用户冻结的执行边界（本次）
+
+- 只做 GUI Surfacing：把已存在的 `sha256` 与 byte-duplicate 信息**只读**展示在资源详情面板；
+- 不新增 identity / equivalence 语义；不做 same-character / semantic / perceptual duplicate；
+- 不改 `ResourceQuery.duplicates()` 语义，不改 2.3-A 的 Query / DTO 实现；
+- 不改 CLI / `cli_query.py` / `main.py`；不改 schema / migration / database；
+- 不改 scanner / hashing / parser / store；不改 `core/duplicate/*`、`core/classification/*`；
+- 不新增 duplicate 持久化；不实现 2.3-D；
+- GUI 不得 import `ResourceQuery` / `LibraryQuery`、不得用 `sqlite3`、不得自带 SQL / 算哈希 / 判重复；
+  数据必须经 `GUI → BrowseService → Query → DTO`。
+
+### 15.2 变更清单
+
+| 文件 | 类型 | 统计 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `ui/detail_panel.py` | 修改 | +93 / -? | Basic 区新增「内容哈希」「字节完全相同的资源数」；新增 `format_sha256()`、两个标签常量；`_set_form_rows()` 增可选 `tooltips`；`show_detail()` 增可选 `duplicate_group` 参数（带默认值） |
+| `ui/main_window.py` | 修改 | +12 | `_on_resource_selected()` 经 `BrowseService.duplicate_group_for()` 取组并传入 `show_detail()` |
+| `tests/test_gui_detail.py` | 修改 | +138 | `_add_resource()` 增可选 `sha256`；新增 `surfaced` / `surfaced_window` 夹具与 9 个 focused 用例 |
+| `docs/phase2/PHASE2_3_LOG.md` | 修改 | 本记录 | 2.3-B / 2.3-C 过程记录 |
+
+**明确未修改**：`core/query/*`（2.3-A 成果）、`core/database/*`、`core/scanner/*`、`core/parsers/*`、
+`core/library/*`、`core/duplicate/*`、`core/classification/*`、`cli_query.py`、`main.py`。
+
+### 15.3 GUI 行为
+
+1. **内容哈希**（Basic 区，标签 `内容哈希`）：显示 `sha256` 前 12 位 + `…`；
+   tooltip 为**完整 64 位**；`sha256 IS NULL` 时显示 `-`（与项目既有空值表现一致，不伪造哈希）。
+2. **字节完全相同的资源数**（Basic 区，标签 `字节完全相同的资源数`）：属于 byte-duplicate 组时
+   显示该组**成员数**（如 `2`）；不是组成员时显示 `1`，tooltip 明确「没有其它与本资源文件
+   字节完全相同的资源」；`sha256 IS NULL` 一律按 `1` 处理（不参与重复判定）。
+3. 文案只用「字节完全相同 / byte-identical」，不使用同一资源 / 同一角色 / canonical / primary 等表述。
+4. 只为**当前选中资源**取组（`duplicate_group_for(rid)`），不加载全局重复列表；
+   既有详情区域、访问器、`basic_rows()`、`show_detail()` 既有参数语义全部不变（新参数带默认值）。
+
+### 15.4 数据获取路径与关键决定
+
+- 数据唯一来源：`BrowseService.detail()` / `review_reasons()` / `duplicate_group_for()`；
+  DetailPanel 只渲染传入值。GUI 内**零** SQL、零 `sqlite3`、零 `hashlib`、零 `ResourceQuery`。
+- `show_detail()` 新增 `duplicate_group: DuplicateGroup | None = None`（**末尾、带默认值**），
+  既有 4 参调用保持有效。
+- `_set_form_rows()` 新增可选 `tooltips`（默认不启用），既有 identity / basic / metadata 调用不受影响。
+- 未引入第二套 duplicate 查询逻辑，未改 Query Layer，未改 CLI。
+
+### 15.5 测试（`tests/test_gui_detail.py`）与验证证据
+
+新增 9 例：`test_format_sha256_truncates_and_handles_none`、
+`test_detail_shows_content_hash_truncated_with_full_tooltip`、
+`test_detail_content_hash_matches_resource_summary`、
+`test_detail_none_sha256_does_not_fake_hash`、
+`test_detail_byte_duplicate_count_for_members`（两成员各自进入结果一致）、
+`test_detail_non_duplicate_shows_one`、`test_detail_null_sha256_is_not_a_duplicate`、
+`test_detail_duplicate_info_does_not_write_database`、`test_gui_has_no_sql_and_no_query_layer_access`（静态）。
+
+| 检查 | 命令 | 结果 |
+| :--- | :--- | :--- |
+| GUI focused | `.venv\Scripts\python.exe -m pytest tests/test_gui_detail.py -q` | **42 passed**（原 33 + 新增 9） |
+| GUI smoke | `.venv\Scripts\python.exe -m pytest tests/test_gui_smoke.py -q` | **19 passed**（含 `test_ui_does_not_bypass_query_layer`） |
+| 全量回归 | `.venv\Scripts\python.exe -m pytest -q` | **734 passed / 0 failed**（≈38 s；725 + 9） |
+| Schema | `node tools/validate_schema.mjs` | 16 表 / 全 OK / **exit 0** |
+| Model sync | `node tools/check_model_sync.mjs` | schema ↔ models 一致 / **exit 0** |
+| ui 静态护栏 | `rg` 检查 | `ui/*` 无 SQL 关键字、无 `hashlib`、import 行无 `sqlite3`/`ResourceQuery`/`LibraryQuery`/`quick_hash`/`content_key` |
+| 越界检查 | `git diff --name-only -- core cli_query.py main.py` | **空** |
+| schema 冻结 | `SCHEMA_VERSION == 2` / `MIGRATIONS == {1,2}` / 16 表 | 成立（未触碰 schema） |
+| duplicate 零写入 | `duplicate_groups` / `duplicate_members` | 仍零写入（无写入者；有测试守门） |
+
+### 15.6 Git 状态
+
+```text
+commit  （见 Phase 2.3-C 提交）
+short
+msg    feat(gui): show content hash and byte-duplicate info
+files  M ui/detail_panel.py · M ui/main_window.py · M tests/test_gui_detail.py · M docs/phase2/PHASE2_3_LOG.md
+tag    未创建（无 phase-2.3-closed）
+```

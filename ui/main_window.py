@@ -194,10 +194,20 @@ class MainWindow(QMainWindow):
         try:
             detail = self._service.detail(rid)
             reasons = self._service.review_reasons(rid) if detail is not None else ()
+            # byte-duplicate 信息同样只经 BrowseService（GUI 不直接访问 Query Layer）。
+            duplicate_group = (
+                self._service.duplicate_group_for(rid) if detail is not None else None
+            )
         except Exception as exc:  # noqa: BLE001 - 单次查询失败不影响界面
             self.detail_panel.show_error(f"{type(exc).__name__}: {exc}")
             return
-        self.detail_panel.show_detail(detail, rid, reasons, self._current_library_name())
+        self.detail_panel.show_detail(
+            detail,
+            rid,
+            reasons,
+            self._current_library_name(),
+            duplicate_group,
+        )
 
     def _current_library_name(self) -> str | None:
         """当前浏览的 Library 名（详情面板展示用；不查库，复用已加载列表）。"""

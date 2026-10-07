@@ -9,7 +9,8 @@
             └── content
                 ├── Preview
                 ├── Identity（标题 / 类型 / 游戏 / 库 / 相对路径）
-                ├── Basic Info（扩展名 / 大小 / 修改时间 / 扫描 / 解析）
+                ├── Basic Info（扩展名 / 大小 / 修改时间 / 扫描 / 解析 /
+                │                内容哈希 / 字节完全相同的资源数）
                 ├── Authors
                 ├── MOD Dependencies（表格；缺失明显可辨）
                 ├── Usage（category 摘要 + 可折叠明细）
@@ -21,6 +22,10 @@
 --------
 - **不查询数据库**：详情由 MainWindow 经 ``BrowseService.detail()`` 取好后传入；
   review reason 同样由 MainWindow 传入（``BrowseService.review_reasons()``）。
+- **不算哈希、不判重复**：``内容哈希`` 直接来自 ``ResourceSummary.sha256``（Phase 2.1 写入、
+  Phase 2.3-A 暴露）；``字节完全相同的资源数`` 直接来自 MainWindow 传入的
+  ``BrowseService.duplicate_group_for()`` 结果（``DuplicateGroup``）。本面板不做任何
+  相似性 / 语义推断；``sha256`` 相等**只**表示文件**字节完全相同**（byte-identical）。
 - **不自算业务语义**：``installed`` / ``category`` 等一律使用 core 给出的结果。
 - preview 复用 C-3：``PreviewService.status()``（GUI 线程，轻量）+
   ``PreviewWorker``（后台生成）+ ``QThreadPool``；``QPixmap`` 只在 GUI 线程创建；
@@ -51,7 +56,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from core.query import ResourceDetail, ReviewReason
+from core.query import DuplicateGroup, ResourceDetail, ReviewReason
 from core.thumbnails import (
     PREVIEW_FAILED as CORE_FAILED,
     PREVIEW_MISSING as CORE_MISSING,
@@ -72,6 +77,13 @@ from ui.resource_model import (
 )
 
 EMPTY_TEXT = "请选择一个资源"
+
+#: Basic 区里「内容哈希」与「字节完全相同的资源数」的行标签（稳定；文案统一由此定义）。
+LABEL_CONTENT_HASH = "内容哈希"
+LABEL_BYTE_DUPLICATE_COUNT = "字节完全相同的资源数"
+
+#: 内容哈希在界面上显示的字符数（其余以 ``…`` 省略；完整值放 tooltip）。
+CONTENT_HASH_DISPLAY_CHARS = 12
 
 #: 人可读的 metadata 键（按此顺序显示，不存在则跳过）。
 METADATA_READABLE_KEYS: tuple[str, ...] = (
@@ -109,6 +121,19 @@ def format_timestamp(value: float | None) -> str:
         return datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S")
     except (OverflowError, OSError, ValueError):
         return str(value)
+
+
+def format_sha256(value: str | None) -> str:
+    """内容哈希的展示短形式：``None`` / 空 → ``-``；否则前若干字符 + ``…``。
+
+    只做显示截断，**不**改值、**不**计算哈希；完整值由调用方放进 tooltip。
+    """
+    if not value:
+        return "-"
+    text = str(value)
+    if len(text) <= CONTENT_HASH_DISPLAY_CHARS:
+        return text
+    return text[:CONTENT_HASH_DISPLAY_CHARS] + "…"
 
 
 class _Section(QGroupBox):
@@ -304,6 +329,7 @@ class DetailPanel(QWidget):
         self._current_resource_id = None
         self._current_detail = None
         self._current_reasons = ()
+        self._current_duplicate_group = None
         self._status_label.setText(EMPTY_TEXT)
         self._stack.setCurrentIndex(0)
 
@@ -311,12 +337,14 @@ class DetailPanel(QWidget):
         self._current_resource_id = int(resource_id)
         self._current_detail = None
         self._current_reasons = ()
+        self._current_duplicate_group = None
         self._status_label.setText(f"找不到资源 #{int(resource_id)}")
         self._stack.setCurrentIndex(0)
 
     def show_error(self, text: str) -> None:
         self._current_detail = None
         self._current_reasons = ()
+        self._current_duplicate_group = None
         self._status_label.setText(f"读取详情失败：{text}")
         self._stack.setCurrentIndex(0)
 
@@ -328,8 +356,14 @@ class DetailPanel(QWidget):
         resource_id: int | None = None,
         review_reasons: tuple[ReviewReason, ...] = (),
         library_name: str | None = None,
+        duplicate_group: DuplicateGroup | None = None,
     ) -> None:
-        """渲染完整详情（数据由 MainWindow 调 ``BrowseService`` 取得）。"""
+        """渲染完整详情（数据由 MainWindow 调 ``BrowseService`` 取得）。
+
+        ``duplicate_group`` 为可选的 byte-duplicate 组（``BrowseService.duplicate_group_for()``
+        的结果，默认 ``None``）：只有它是本资源所属的组时才表示「存在字节完全相同的资源」。
+        该参数带默认值，既有调用方（不传）行为不变。
+        """
         if detail is None:
             if resource_id is None:
                 self.show_empty()
@@ -342,9 +376,10 @@ class DetailPanel(QWidget):
         self._current_resource_id = detail.resource.id
         self._current_detail = detail
         self._current_reasons = tuple(review_reasons or ())
+        self._current_duplicate_group = duplicate_group
 
         self._render_identity(detail, library_name)
-        self._render_basic(detail)
+        self._render_basic(detail, duplicate_group)
         self._render_authors(detail)
         self._render_mods(detail)
         self._render_usage(detail)
@@ -358,9 +393,17 @@ class DetailPanel(QWidget):
     # ---- 渲染：各区域 ----------------------------------------------------
 
     def _set_form_rows(
-        self, layout: QFormLayout, rows: list[tuple[str, str]]
+        self,
+        layout: QFormLayout,
+        rows: list[tuple[str, str]],
+        *,
+        tooltips: dict[str, str] | None = None,
     ) -> dict[str, str]:
-        """重建表单行；返回 ``{标签: 展示文本}``（供测试断言）。"""
+        """重建表单行；返回 ``{标签: 展示文本}``（供测试断言）。
+
+        ``tooltips`` 为可选的 ``{标签: tooltip 文本}``；只对命中的行生效，
+        空字符串按「无 tooltip」处理。既有调用方不传该参数时行为不变。
+        """
         while layout.rowCount():
             layout.removeRow(0)
         written: dict[str, str] = {}
@@ -370,6 +413,9 @@ class DetailPanel(QWidget):
             value_label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
             )
+            tooltip = (tooltips or {}).get(label)
+            if tooltip:
+                value_label.setToolTip(tooltip)
             layout.addRow(f"{label}：", value_label)
             written[label] = value
         return written
@@ -388,8 +434,27 @@ class DetailPanel(QWidget):
         # 完整路径放 tooltip（不直接占用版面）
         self.identity_section.setToolTip(resource.file_path)
 
-    def _render_basic(self, detail: ResourceDetail) -> None:
+    def _render_basic(
+        self, detail: ResourceDetail, duplicate_group: DuplicateGroup | None = None
+    ) -> None:
         resource = detail.resource
+        # 内容哈希：直接展示已有列（只读派生值），不计算、不推断。
+        sha256 = resource.sha256
+        # 字节完全相同的资源数：属于 byte-duplicate 组时为组大小；否则为 1（仅本资源）。
+        duplicate_count = (
+            duplicate_group.member_count if duplicate_group is not None else 1
+        )
+        if duplicate_group is not None:
+            duplicate_tooltip = (
+                f"本资源与另外 {duplicate_group.member_count - 1} 个资源的文件"
+                "字节完全相同（byte-identical）"
+            )
+        else:
+            duplicate_tooltip = "没有其它与本资源文件字节完全相同的资源"
+        tooltips = {
+            LABEL_CONTENT_HASH: sha256 or "",
+            LABEL_BYTE_DUPLICATE_COUNT: duplicate_tooltip,
+        }
         self._basic_rows = self._set_form_rows(
             self._basic_layout,
             [
@@ -398,8 +463,14 @@ class DetailPanel(QWidget):
                 ("修改时间", format_timestamp(resource.modified_time)),
                 ("扫描状态", resource.scan_status),
                 ("解析状态", resource.parse_status),
+                (LABEL_CONTENT_HASH, format_sha256(sha256)),
+                (LABEL_BYTE_DUPLICATE_COUNT, str(duplicate_count)),
             ],
+            tooltips=tooltips,
         )
+        self._basic_tooltips = {
+            label: text for label, text in tooltips.items() if text
+        }
 
     def _render_authors(self, detail: ResourceDetail) -> None:
         if detail.authors:
@@ -648,6 +719,10 @@ class DetailPanel(QWidget):
     def basic_rows(self) -> dict[str, str]:
         return dict(getattr(self, "_basic_rows", {}))
 
+    def basic_row_tooltips(self) -> dict[str, str]:
+        """Basic 区各行的 tooltip（只包含非空 tooltip）。"""
+        return dict(getattr(self, "_basic_tooltips", {}))
+
     def authors_text(self) -> str:
         return self.authors_label.text()
 
@@ -714,7 +789,11 @@ class DetailPanel(QWidget):
 __all__ = [
     "DetailPanel",
     "EMPTY_TEXT",
+    "LABEL_CONTENT_HASH",
+    "LABEL_BYTE_DUPLICATE_COUNT",
+    "CONTENT_HASH_DISPLAY_CHARS",
     "METADATA_READABLE_KEYS",
     "format_file_size",
+    "format_sha256",
     "format_timestamp",
 ]
