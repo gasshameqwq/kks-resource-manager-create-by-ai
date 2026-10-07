@@ -5,10 +5,11 @@
 > 权威契约：`docs/phase2/PHASE2_0_C_ARCHITECTURE_DESIGN.md`（§5.4 / §5.5 / §8 / §13.7 / §14 / §15 / §16 / §18.1）
 > 前序基线：`docs/phase2/PHASE2_2_CLOSURE_REPORT.md`（Phase 2.2 = CLOSED / PASS）
 > 阶段定义（2.0-C §16）：**Phase 2.3 = Query / CLI / GUI Surfacing**
-> 状态：**只读审查完成 → 用户确认范围 → 2.3-A / 2.3-B / 2.3-C 依次实施并提交**；
+> 状态：**Phase 2.3 = CLOSED / PASS**（只读审查 → 用户确认范围 → 2.3-A / 2.3-B / 2.3-C
+> 依次实施、验证、独立提交 → Final Closure / Audit → `phase-2.3-closed`）；
 > 已实现 Query / DTO Surfacing（含 BrowseService 只读转发）、CLI Surfacing、GUI Surfacing
 > （详情面板只读展示内容哈希与 byte-duplicate）；
-> 未进入 2.3-D（FilterBar）；未创建 Phase 2.3 Closure Report。
+> 2.3-D（FilterBar）明确不做；正式收尾报告见 `docs/phase2/PHASE2_3_CLOSURE_REPORT.md`。
 
 ---
 
@@ -296,6 +297,11 @@ scanner / parser / hashing / store：未修改
 Git：2.3-A / 2.3-B / 2.3-C 各自独立提交；未打 Phase 2.3 总阶段 tag
 Phase 2.4 Final Audit：未开始
 ```
+
+> **Phase 2.3 Final Closure 更新（2026-10-07）**：上面代码块是 2.3-B 当时的点状态快照。
+> 最终状态：Phase 2.3 Closure Report **已创建**（`docs/phase2/PHASE2_3_CLOSURE_REPORT.md`）；
+> `phase-2.3-closed` tag **已创建**并指向 Phase 2.3 收尾提交；结论为 **Phase 2.3 = CLOSED / PASS**。
+> 最终 Git 状态见本文件 §16。
 
 ---
 
@@ -635,3 +641,25 @@ tag    未创建（无 phase-2.3-closed）
 
 > 说明：2.3-C 的提交在本记录写入之前已完成（同一会话内），§15.6 记录的即该提交。
 > 本次对 §15.6 的补写（hash / parent / diff stat）为**纯文档**收尾，不改变任何功能代码。
+
+---
+
+## 16. 最终 Git 状态（Phase 2.3 Final Closure）
+
+```text
+branch  main
+HEAD    Phase 2.3 收尾提交（即本 §16 所在提交；phase-2.3-closed 指向它）
+commits
+  8f45a46  feat(query): add byte-duplicate capability           （Phase 2.2；tag phase-2.2-closed）
+  10f2b79  feat(query): expose sha256 and duplicate read model  （Phase 2.3-A）
+  1b595e6  feat(cli): expose byte-duplicate query               （Phase 2.3-B）
+  149a0d9  feat(gui): show content hash and byte-duplicate info  （Phase 2.3-C）
+  0471ea4  docs: record phase 2.3-c commit hash in log          （文档收尾）
+  ......   docs: close phase 2.3 surfacing                      （Phase 2.3 收尾 + Closure Report）
+tags    phase-2.0-closed · phase-2.1-closed · phase-2.2-closed · phase-2.3-closed
+status  clean
+```
+
+> 说明：§12.7 / §13.7 / §15.6 的 Git 代码块分别是 2.3-A / 2.3-B / 2.3-C 完成当时的
+> **点状态快照**（所以其中写有「未提交 / 未打 tag」）；Phase 2.3 的**最终**状态以本 §16
+> 与 `docs/phase2/PHASE2_3_CLOSURE_REPORT.md` 为准。
