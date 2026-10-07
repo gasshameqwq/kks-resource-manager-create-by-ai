@@ -18,7 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.database import db as database  # noqa: E402
 from core.library import LibraryStore  # noqa: E402
+from core.query import ResourceQuery  # noqa: E402
 from core.scanner import LibraryScanner, ResourceStore  # noqa: E402
+from core.app import ResourceWriteService  # noqa: E402
 from tests.builders import (  # noqa: E402
     MARKER_KK,
     MARKER_SUN,
@@ -759,3 +761,153 @@ def test_author_relations_rebuilt_not_duplicated(env):
     assert conn.execute("SELECT count(*) AS c FROM authors").fetchone()["c"] == 2, (
         "Alice 的实体可以保留，但不再与该资源关联"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.1 Step 2 —— Scanner 不写用户数据（display_name ownership）
+# ---------------------------------------------------------------------------
+
+
+def _resource_id_by_path(conn, path) -> int:
+    row = conn.execute(
+        "SELECT id FROM resources WHERE file_path_key = ?",
+        (database.normalize_path_key(path),),
+    ).fetchone()
+    return int(row["id"])
+
+
+def _resource_row(conn, resource_id: int) -> dict:
+    return dict(
+        conn.execute("SELECT * FROM resources WHERE id = ?", (resource_id,)).fetchone()
+    )
+
+
+def test_new_card_resource_leaves_display_name_null(env):
+    """Scanner INSERT 新卡片时不得写 display_name（纯用户数据）。"""
+    conn, root, library = env
+    card = write_card(root / "card.png", lastname="鹿目", firstname="まどか")
+    LibraryScanner(conn).scan(library.id)
+
+    row = _resource_row(conn, _resource_id_by_path(conn, card))
+    assert row["name"] == "鹿目まどか"
+    assert row["display_name"] is None, "Scanner 不得在 INSERT 时写 display_name"
+
+
+def test_new_mod_resource_leaves_display_name_null(env):
+    """Scanner INSERT 新 zipmod 时同样不得写 display_name。"""
+    conn, root, library = env
+    mod = write_zipmod(root / "mod.zipmod", "com.example.x", name="Test Mod")
+    LibraryScanner(conn).scan(library.id)
+
+    row = _resource_row(conn, _resource_id_by_path(conn, mod))
+    assert row["name"] == "Test Mod"
+    assert row["display_name"] is None, "Scanner 不得在 INSERT 时写 display_name"
+
+
+def test_rescan_keeps_user_display_name_when_name_changes(env):
+    """Invariant A：用户 override 在 Parser 改变 machine name 后保持不变。"""
+    conn, root, library = env
+    card = root / "card.png"
+    write_card(card, lastname="Old", firstname="Name")
+    scanner = LibraryScanner(conn)
+    scanner.scan(library.id)
+    rid = _resource_id_by_path(conn, card)
+
+    ResourceWriteService(conn).set_display_name(rid, "Custom Name")
+    assert _resource_row(conn, rid)["display_name"] == "Custom Name"
+
+    # 内容变化（长度也不同）→ 触发重新解析 + UPDATE
+    write_card(card, lastname="Renamed", firstname="Character")
+    result = scanner.scan(library.id)
+    assert result.stats.updated == 1
+
+    row = _resource_row(conn, rid)
+    assert row["name"] == "RenamedCharacter"        # machine fact 正常更新
+    assert row["display_name"] == "Custom Name"      # user data 未被覆盖
+
+
+def test_rescan_does_not_invent_display_name_when_no_override(env):
+    """没有 override 时，重扫不得凭空写入 display_name。"""
+    conn, root, library = env
+    card = root / "card.png"
+    write_card(card, lastname="Old", firstname="Name")
+    scanner = LibraryScanner(conn)
+    scanner.scan(library.id)
+    rid = _resource_id_by_path(conn, card)
+    assert _resource_row(conn, rid)["display_name"] is None
+
+    write_card(card, lastname="Renamed", firstname="Character")
+    scanner.scan(library.id)
+
+    row = _resource_row(conn, rid)
+    assert row["name"] == "RenamedCharacter"
+    assert row["display_name"] is None, "无 override 时重扫不得写入 display_name"
+
+
+def test_rescan_does_not_touch_notes_or_user_type(env):
+    """Scanner 不得修改 notes / 用户类型修正 / type_source='user'。"""
+    conn, root, library = env
+    card = root / "card.png"
+    write_card(card, lastname="Old", firstname="Name")
+    scanner = LibraryScanner(conn)
+    scanner.scan(library.id)
+    rid = _resource_id_by_path(conn, card)
+
+    service = ResourceWriteService(conn)
+    service.set_notes(rid, "用户备注")
+    service.set_resource_type(rid, "mod")
+
+    write_card(card, lastname="Renamed", firstname="Character")
+    scanner.scan(library.id)
+
+    row = _resource_row(conn, rid)
+    assert row["notes"] == "用户备注"
+    assert row["resource_type"] == "mod"      # 用户类型修正保留
+    assert row["type_source"] == "user"
+
+
+def test_invariant_b_clear_display_name_falls_back_to_name(env):
+    """Invariant B：clear ⇒ display_name = NULL ⇒ effective 回退到当前 name。"""
+    conn, root, library = env
+    card = write_card(root / "card.png", lastname="Alice", firstname="Name")
+    LibraryScanner(conn).scan(library.id)
+    rid = _resource_id_by_path(conn, card)
+
+    service = ResourceWriteService(conn)
+    service.set_display_name(rid, "Custom")
+    assert ResourceQuery(conn).summary(rid).effective_display_name == "Custom"
+
+    service.set_display_name(rid, None)          # 用户清除
+    assert _resource_row(conn, rid)["display_name"] is None
+
+    summary = ResourceQuery(conn).summary(rid)
+    assert summary.effective_display_name == "AliceName"
+    assert summary.title == "AliceName"
+
+
+def test_invariant_c_equal_to_name_override_survives_rescan(env):
+    """Invariant C：display_name == name 仍是 override，且重扫改 name 后保持不变。"""
+    conn, root, library = env
+    card = root / "card.png"
+    write_card(card, lastname="Alice", firstname="Name")   # machine name = "AliceName"
+    scanner = LibraryScanner(conn)
+    scanner.scan(library.id)
+    rid = _resource_id_by_path(conn, card)
+    machine_name = _resource_row(conn, rid)["name"]
+    assert _resource_row(conn, rid)["display_name"] is None
+
+    # 用户把展示名设成与 machine name 完全相同的值
+    ResourceWriteService(conn).set_display_name(rid, machine_name)
+    stored = _resource_row(conn, rid)
+    assert stored["display_name"] == stored["name"]   # 值恰好相同……
+    assert stored["display_name"] is not None         # ……但仍是有效 override
+
+    # 后续 Scanner 改变 name，用户 override 必须保持
+    write_card(card, lastname="Renamed", firstname="Character")
+    scanner.scan(library.id)
+
+    after = _resource_row(conn, rid)
+    assert after["name"] == "RenamedCharacter"        # machine fact 已更新
+    assert after["display_name"] == machine_name      # user override 保持旧值
+    assert after["display_name"] is not None
+    assert ResourceQuery(conn).summary(rid).effective_display_name == machine_name

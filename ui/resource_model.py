@@ -72,14 +72,13 @@ def placeholder_pixmap(state: str) -> QPixmap:
 
 
 def display_title(resource: ResourceSummary) -> str:
-    """列表显示名：``display_name`` → ``name`` → 文件名 → 完整路径。"""
-    if resource.display_name:
-        return resource.display_name
-    if resource.name:
-        return resource.name
-    if resource.relative_path:
-        return resource.relative_path.replace("\\", "/").rsplit("/", 1)[-1]
-    return resource.file_path
+    """列表显示名 —— 委托 core 的权威实现（``ResourceSummary.title``）。
+
+    Phase 3.1 Step 3：UI **不再**维护独立的 display_name fallback chain。
+    业务定义（``display_name`` / ``name``）与展示回退（文件名 / 完整路径）
+    只在 :class:`core.query.dto.ResourceSummary` 中定义一次。
+    """
+    return resource.title
 
 
 class ResourceListModel(QAbstractListModel):

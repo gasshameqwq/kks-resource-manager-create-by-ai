@@ -19,6 +19,13 @@
     python main.py query missing-mods | orphan-mods | usage-categories | ...
                                                只读查询（Phase 1.3-B；薄封装 Query Layer）
 
+    python main.py resource set-display-name <id|路径> <名称>
+    python main.py resource set-display-name <id|路径> --clear
+    python main.py resource set-notes <id|路径> <备注>
+    python main.py resource set-notes <id|路径> --clear
+    python main.py resource set-type <id|路径> <类型>
+                                               用户数据编辑（Phase 3.1；薄适配层）
+
     python main.py gui                        启动 PyQt6 图形界面（Phase 1.4-C）
 
 GUI 逻辑全部放在 ``ui/`` 中，本入口只负责创建 ``QApplication`` 并进入事件循环；
@@ -271,6 +278,130 @@ def _dispatch_library(args) -> int:
     return 2  # pragma: no cover - argparse 已保证不会走到这里
 
 
+# ---------------------------------------------------------------------------
+# Phase 3.1 —— 用户数据编辑（CLI 薄适配层）
+# ---------------------------------------------------------------------------
+#
+# 严格分层（Contract §5.3）：
+#
+#     CLI → ResourceQuery.resolve()（只读解析目标） → ResourceWriteService → DB
+#
+# 本层**不写 SQL**、不 import sqlite3、不调用 ResourceStore，也不复制写服务语义；
+# 值的归一化 / 校验 / 事务 / 错误语义全部以 ResourceWriteService 为准。
+
+
+def _resource_write_context():
+    """初始化数据库并返回 ``(conn, ResourceQuery, ResourceWriteService)``。"""
+    from core.app import ResourceWriteService
+    from core.database import db as database
+    from core.query import ResourceQuery
+
+    database.initialize()
+    conn = database.connect()
+    return conn, ResourceQuery(conn), ResourceWriteService(conn)
+
+
+def _resolve_resource_id(query, target: str) -> int | None:
+    """用只读的 ``ResourceQuery.resolve()`` 解析目标；找不到返回 ``None``。"""
+    summary = query.resolve(target)
+    return int(summary.id) if summary is not None else None
+
+
+def _report_write_error(exc: Exception) -> int:
+    """把写服务异常转成简洁的 CLI 错误输出（不吞异常、不打印 traceback）。"""
+    from core.app import InvalidResourceValue, ResourceNotFound
+
+    if isinstance(exc, ResourceNotFound):
+        print(f"找不到资源：{exc.resource_id}", file=sys.stderr)
+    elif isinstance(exc, InvalidResourceValue):
+        print(f"非法取值（{exc.field}）：{exc.value!r}", file=sys.stderr)
+    else:
+        print(f"写入失败：{exc}", file=sys.stderr)
+    return 1
+
+
+def _run_optional_value_command(
+    target: str,
+    value: str | None,
+    clear: bool,
+    *,
+    method_name: str,
+    label: str,
+) -> int:
+    """``set-display-name`` / ``set-notes`` 共用的薄流程（value 与 --clear 互斥）。"""
+    from core.app import ResourceWriteError
+
+    if clear and value is not None:
+        print(f"参数错误：--clear 不能与 {label} 值同时使用。", file=sys.stderr)
+        return 2
+    if not clear and value is None:
+        print(f"参数错误：需要提供 {label} 值，或使用 --clear。", file=sys.stderr)
+        return 2
+
+    conn, query, service = _resource_write_context()
+    try:
+        resource_id = _resolve_resource_id(query, target)
+        if resource_id is None:
+            print(f"找不到资源：{target}", file=sys.stderr)
+            return 1
+        try:
+            getattr(service, method_name)(resource_id, None if clear else value)
+        except ResourceWriteError as exc:
+            return _report_write_error(exc)
+        if clear:
+            print(f"已清除资源 #{resource_id} 的{label}（写为 NULL）")
+        else:
+            print(f"已设置资源 #{resource_id} 的{label}")
+        return 0
+    finally:
+        conn.close()
+
+
+def cmd_resource_set_display_name(target: str, value: str | None, clear: bool) -> int:
+    """设置 / 清除用户展示名覆盖（``display_name``）。"""
+    return _run_optional_value_command(
+        target, value, clear, method_name="set_display_name", label="展示名覆盖"
+    )
+
+
+def cmd_resource_set_notes(target: str, value: str | None, clear: bool) -> int:
+    """设置 / 清除用户备注（``notes``）。"""
+    return _run_optional_value_command(
+        target, value, clear, method_name="set_notes", label="备注"
+    )
+
+
+def cmd_resource_set_type(target: str, value: str) -> int:
+    """设置用户类型修正（``resource_type`` + ``type_source='user'``）。"""
+    from core.app import ResourceWriteError
+
+    conn, query, service = _resource_write_context()
+    try:
+        resource_id = _resolve_resource_id(query, target)
+        if resource_id is None:
+            print(f"找不到资源：{target}", file=sys.stderr)
+            return 1
+        try:
+            service.set_resource_type(resource_id, value)
+        except ResourceWriteError as exc:
+            return _report_write_error(exc)
+        print(f"已设置资源 #{resource_id} 的用户类型：{value}（type_source = 'user'）")
+        return 0
+    finally:
+        conn.close()
+
+
+def _dispatch_resource(args) -> int:
+    command = args.resource_command
+    if command == "set-display-name":
+        return cmd_resource_set_display_name(args.target, args.value, args.clear)
+    if command == "set-notes":
+        return cmd_resource_set_notes(args.target, args.value, args.clear)
+    if command == "set-type":
+        return cmd_resource_set_type(args.target, args.value)
+    return 2  # pragma: no cover - argparse 已保证不会走到这里
+
+
 def cmd_gui() -> int:
     """启动 PyQt6 GUI（入口只负责启动；界面逻辑在 ``ui/``）。"""
     from ui.main_window import run_gui
@@ -323,6 +454,34 @@ def build_parser() -> argparse.ArgumentParser:
     # Phase 1.3-B：只读查询（Query Layer 的薄 CLI 适配层）
     add_query_parser(sub)
 
+    # Phase 3.1：用户数据编辑（薄适配层 → ResourceWriteService）
+    resource = sub.add_parser(
+        "resource", help="编辑资源上的用户数据（展示名 / 备注 / 用户类型）"
+    )
+    resource_sub = resource.add_subparsers(dest="resource_command", required=True)
+
+    display = resource_sub.add_parser(
+        "set-display-name", help="设置或清除用户展示名覆盖（display_name）"
+    )
+    display.add_argument("target", help="资源的 id / 路径 / path_key / relative_path")
+    display.add_argument(
+        "value", nargs="?", default=None, help="展示名；用 --clear 清除（写 NULL）"
+    )
+    display.add_argument("--clear", action="store_true", help="清除展示名覆盖")
+
+    notes = resource_sub.add_parser("set-notes", help="设置或清除用户备注（notes）")
+    notes.add_argument("target", help="资源的 id / 路径 / path_key / relative_path")
+    notes.add_argument(
+        "value", nargs="?", default=None, help="备注；用 --clear 清除（写 NULL）"
+    )
+    notes.add_argument("--clear", action="store_true", help="清除备注")
+
+    type_cmd = resource_sub.add_parser(
+        "set-type", help="设置用户类型修正（type_source='user'）"
+    )
+    type_cmd.add_argument("target", help="资源的 id / 路径 / path_key / relative_path")
+    type_cmd.add_argument("value", help="资源类型（见 core.models.RESOURCE_TYPES）")
+
     sub.add_parser("gui", help="启动图形界面（Phase 1.4-C）")
 
     return parser
@@ -343,6 +502,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_scan(args.target, full=args.full)
     if getattr(args, "command", None) == "query":
         return dispatch_query(args)
+    if getattr(args, "command", None) == "resource":
+        return _dispatch_resource(args)
     if getattr(args, "command", None) == "gui":
         return cmd_gui()
     return cmd_info()

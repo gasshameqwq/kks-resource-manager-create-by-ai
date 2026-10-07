@@ -13,6 +13,13 @@
 - zipmod：``resources(type='mod')`` + 一行 ``mods``（以 ``guid`` 为身份）。
 - 关系一律 **先删后插**（在同一个事务内），因此重扫不会产生重复行。
 - 未安装的 MOD：``resource_mods.mod_id`` 留空，但关系行照建，**不**凭空造 ``mods`` 实体。
+
+用户数据边界（Phase 3.1 Contract §2.2 / §3.1）
+--------------------------------------------
+- 本层是**机器写入者**：只写 machine facts（含新建资源时的 ``type_source = 'auto'`` 初始值）。
+- 本层**绝不**写入 ``display_name`` / ``notes`` / ``type_source = 'user'``。
+  用户展示名覆盖是纯用户数据，只由 ``core.app.ResourceWriteService`` 写入；
+  重扫既不读取、也不比较、更不覆盖它。
 """
 
 from __future__ import annotations
@@ -107,7 +114,10 @@ class ResourceStore:
         sha256: str,
         authors_raw: list[str] | None = None,
     ) -> tuple[int, str]:
-        """写入/更新一张卡片，并重建它的关系。返回 (resource_id, outcome)。"""
+        """写入/更新一张卡片，并重建它的关系。返回 (resource_id, outcome)。
+
+        只写机器事实；**不写** ``display_name``（纯用户数据，见模块 docstring）。
+        """
         resource_type = parsed.card_type or "unknown"
         metadata = build_card_metadata(parsed, authors_raw)
         needs_review = 1 if (parsed.parse_status != "ok" or not parsed.name) else 0
@@ -116,17 +126,16 @@ class ResourceStore:
         if existing is None:
             cursor = self.conn.execute(
                 "INSERT INTO resources("
-                " resource_type, type_source, library_id, name, display_name,"
+                " resource_type, type_source, library_id, name,"
                 " file_path, file_path_key, relative_path, file_size, modified_time,"
                 " sha256,"
                 " extension, parse_status, parse_error, card_marker, metadata_json,"
                 " scan_status, needs_review, last_scanned_at)"
-                " VALUES (?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
+                " VALUES (?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
                 " 'present', ?, datetime('now'))",
                 (
                     resource_type,
                     library_id,
-                    parsed.name,
                     parsed.name,
                     str(path),
                     path_key,
@@ -149,13 +158,11 @@ class ResourceStore:
             # 用户手工确认过的类型不允许被自动覆盖（Phase 0 约定）
             if existing["type_source"] == "user":
                 resource_type = existing["resource_type"]
-            # display_name 已经被用户改写过就保留（只在它仍等于旧 name 时跟随更新）
-            display_name = parsed.name
-            if existing["display_name"] not in (None, existing["name"]):
-                display_name = existing["display_name"]
+            # display_name 是纯用户数据（Phase 3.1 Contract §2.2 / §3.1）：
+            # 重扫既不写它，也不依据「是否等于旧 name」做任何判断。
             self.conn.execute(
                 "UPDATE resources SET library_id = ?, resource_type = ?, name = ?,"
-                " display_name = ?, file_path = ?, relative_path = ?, file_size = ?,"
+                " file_path = ?, relative_path = ?, file_size = ?,"
                 " modified_time = ?, sha256 = ?, extension = ?, parse_status = ?,"
                 " parse_error = ?,"
                 " card_marker = ?, metadata_json = ?, scan_status = 'present',"
@@ -166,7 +173,6 @@ class ResourceStore:
                     library_id,
                     resource_type,
                     parsed.name,
-                    display_name,
                     str(path),
                     relative_path,
                     size,
@@ -202,21 +208,23 @@ class ResourceStore:
         parsed: ZipmodParseResult,
         sha256: str,
     ) -> tuple[int, str]:
-        """写入/更新一个 zipmod（resources + mods）。返回 (resource_id, outcome)。"""
+        """写入/更新一个 zipmod（resources + mods）。返回 (resource_id, outcome)。
+
+        只写机器事实；**不写** ``display_name``（纯用户数据，见模块 docstring）。
+        """
         display = parsed.name or parsed.guid
         existing = self.find_by_path_key(path_key)
         if existing is None:
             cursor = self.conn.execute(
                 "INSERT INTO resources("
-                " resource_type, type_source, library_id, name, display_name,"
+                " resource_type, type_source, library_id, name,"
                 " file_path, file_path_key, relative_path, file_size, modified_time,"
                 " sha256, extension, parse_status, scan_status, needs_review,"
                 " last_scanned_at)"
-                " VALUES ('mod', 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', 0,"
+                " VALUES ('mod', 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', 0,"
                 " datetime('now'))",
                 (
                     library_id,
-                    display,
                     display,
                     str(path),
                     path_key,
@@ -237,12 +245,10 @@ class ResourceStore:
                 if existing["type_source"] == "user"
                 else "mod"
             )
-            display_name = display
-            if existing["display_name"] not in (None, existing["name"]):
-                display_name = existing["display_name"]
+            # display_name 是纯用户数据：重扫不写、不判断、不覆盖。
             self.conn.execute(
                 "UPDATE resources SET library_id = ?, resource_type = ?, name = ?,"
-                " display_name = ?, file_path = ?, relative_path = ?, file_size = ?,"
+                " file_path = ?, relative_path = ?, file_size = ?,"
                 " modified_time = ?, sha256 = ?, extension = ?, parse_status = ?,"
                 " parse_error = NULL,"
                 " scan_status = 'present', updated_at = datetime('now'),"
@@ -251,7 +257,6 @@ class ResourceStore:
                     library_id,
                     resource_type,
                     display,
-                    display_name,
                     str(path),
                     relative_path,
                     size,

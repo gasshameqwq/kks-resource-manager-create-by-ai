@@ -81,6 +81,16 @@ class ResourceSummary:
     **不**表示同角色 / 同 MOD / 同逻辑资源。本 DTO **不计算**任何哈希，
     未解析 / 未计算哈希的资源为 ``None``。为避免破坏既有构造方式，
     该字段带默认值并置于末尾。
+
+    Phase 3.1 Step 4 起，追加两个**只读**用户相关字段（同样是 additive、
+    带默认值、置于末尾，保持 Phase 2.3 以来的兼容原则）：
+
+    - ``type_source`` —— ``resources.type_source`` 的只读值（``'auto'`` / ``'user'``），
+      表示 ``resource_type`` 当前由机器还是用户负责；
+    - ``notes``       —— ``resources.notes`` 的只读值（用户备注，未设置为 ``None``）。
+
+    本 DTO **不修改**数据库值，也不包含任何写能力；
+    用户数据的写入只经 ``core.app.ResourceWriteService``。
     """
 
     id: int
@@ -102,6 +112,8 @@ class ResourceSummary:
     plugin_count: int = 0
     author_count: int = 0
     sha256: str | None = None
+    type_source: str = "auto"
+    notes: str | None = None
 
     @property
     def game(self) -> str | None:
@@ -109,9 +121,35 @@ class ResourceSummary:
         return game_for_card_marker(self.card_marker)
 
     @property
+    def effective_display_name(self) -> str | None:
+        """业务展示名 —— Phase 3.1 Contract §4.4 的**唯一权威定义**。
+
+        ``display_name`` 非 NULL 且 ``strip()`` 后非空 ⇒ 它就是用户 override；
+        否则回退到机器解析名 ``name``。
+
+        - 历史遗留的 ``""`` / 纯空白按「无 override」处理（读取侧归一化）；
+        - **不得**用 ``display_name == name`` 判断 override：两者相等时
+          ``display_name`` 仍是非 NULL，依然是有效 override。
+        """
+        if self.display_name is not None and self.display_name.strip() != "":
+            return self.display_name
+        return self.name
+
+    @property
     def title(self) -> str:
-        """展示用标题：优先 display_name，其次 name，最后文件名。"""
-        return self.display_name or self.name or self.file_path
+        """展示用标题（core 唯一权威实现）。
+
+        回退顺序：``effective_display_name`` → ``relative_path`` 的文件名 → ``file_path``。
+        UI / CLI 一律消费本属性，不得各自维护独立的 fallback chain。
+        """
+        effective = self.effective_display_name
+        if effective:
+            return effective
+        if self.relative_path:
+            filename = self.relative_path.replace("\\", "/").rsplit("/", 1)[-1]
+            if filename:
+                return filename
+        return self.file_path
 
 
 @dataclass(frozen=True)

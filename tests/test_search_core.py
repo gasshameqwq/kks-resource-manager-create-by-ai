@@ -787,7 +787,13 @@ def test_real_sample_filename_search_hits_via_relative_path(real_db) -> None:
     ).fetchone()
     # 事实断言（Phase 1.4-A 保留）：解析名是日文，文件名是中文
     assert row["name"] == _SAYAKA_NAME
-    assert row["display_name"] == _SAYAKA_NAME
+    # Phase 3.1 Step 2：Scanner 不再写 display_name（纯用户数据）。
+    # 无 override 时 effective display name 回退到解析名。
+    assert row["display_name"] is None
+    summary = rq.summary(sayaka)
+    assert summary is not None
+    assert summary.effective_display_name == _SAYAKA_NAME
+    assert summary.title == _SAYAKA_NAME
     assert "沙耶香" in row["relative_path"], "文件名里确实是中文"
     assert "沙耶香" not in row["name"], "但解析名里没有该子串"
     # 事实断言（Phase 1.4-A 保留）：resources.author 是死列
