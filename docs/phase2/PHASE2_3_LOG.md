@@ -288,7 +288,7 @@ GUI 未绕过 `BrowseService`；CLI JSON 向后兼容；真实样本只读不变
 Phase 2.3 只读审查 + 架构评审 + 实施规划：完成
 Phase 2.3-A（Query / DTO Surfacing + BrowseService 只读转发）：**实施完成，验证通过，已提交**（10f2b79）
 Phase 2.3-B（CLI Surfacing）：**实施完成，验证通过，已提交**（1b595e6）
-Phase 2.3-C（GUI Surfacing）：**实施完成，验证通过，已提交**（见 §15）
+Phase 2.3-C（GUI Surfacing）：**实施完成，验证通过，已提交**（149a0d9；见 §15）
 Phase 2.3-D（FilterBar duplicate filter，可选）：未开始（本次明确排除）
 Phase 2.3 Closure Report：未创建（按要求不创建）
 schema / migration / 数据库：未修改
@@ -623,9 +623,15 @@ tag    未创建（无 phase-2.3-closed）
 ### 15.6 Git 状态
 
 ```text
-commit  （见 Phase 2.3-C 提交）
-short
+commit 149a0d902c2ad5e28d5b5c035cd06a8088b2b0e8
+short  149a0d9
+parent 1b595e6（Phase 2.3-B — feat(cli): expose byte-duplicate query）
 msg    feat(gui): show content hash and byte-duplicate info
 files  M ui/detail_panel.py · M ui/main_window.py · M tests/test_gui_detail.py · M docs/phase2/PHASE2_3_LOG.md
+stat   4 files changed, 452 insertions(+), 17 deletions(-)
+status clean（提交后工作区无改动）
 tag    未创建（无 phase-2.3-closed）
 ```
+
+> 说明：2.3-C 的提交在本记录写入之前已完成（同一会话内），§15.6 记录的即该提交。
+> 本次对 §15.6 的补写（hash / parent / diff stat）为**纯文档**收尾，不改变任何功能代码。
