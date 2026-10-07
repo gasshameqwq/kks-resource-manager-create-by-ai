@@ -1,0 +1,16 @@
+# KKS Resource Manager —— 运行依赖
+#
+# Phase 0 只做架构与数据库初始化，不运行 UI；
+# 下列依赖在 Phase 1（扫描 + 卡片识别 + 浏览器）开始使用。
+
+# --- 核心（Phase 1 起必需）---
+PyQt6>=6.5            # 桌面 UI
+msgpack>=1.0          # KKS/KK 卡片尾部数据块解码
+Pillow>=10.0          # 缩略图生成 / 图片校验
+
+# --- 后续阶段按需启用（Phase 2+）---
+# pyzipper>=0.3       # 加密 zipmod 读取（Phase 2）
+# Send2Trash>=1.8     # 删除走回收站（Phase 5，危险操作前先用）
+
+# --- 开发/测试（Phase 1 起）---
+pytest>=8.0

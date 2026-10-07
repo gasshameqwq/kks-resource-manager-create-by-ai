@@ -1,0 +1,44 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# ---- 打包产物 ----
+build/
+dist/
+*.spec
+
+# ---- 本应用运行时数据（不纳入版本管理）----
+data/
+!data/.gitkeep
+config.json
+kks_rm_config.json
+*.log
+logs/
+
+# ---- 本地数据库 / 缓存 ----
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+thumbnail_cache/
+mod_index.json
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 参考源码（只读研究用，不入库）----
+_reference/
+reference/
+vendor_src/
