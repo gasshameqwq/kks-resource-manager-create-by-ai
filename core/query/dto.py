@@ -154,6 +154,33 @@ class ResourceDetail:
 
 
 @dataclass(frozen=True)
+class DuplicateGroup:
+    """一组 **byte-identical** 的资源（``sha256`` 完全相同）。
+
+    语义边界（Phase 2.2）
+    --------------------
+    - ``sha256`` 相等**只**表示**文件字节完全相同**（byte-identical）；
+      **不**表示「同角色 / 同 MOD / 同逻辑资源」，本层不做任何逻辑相似性推断。
+    - 这是**只读派生结果**：由 ``GROUP BY sha256`` 计算得到，**不落库**
+      （不写 ``duplicate_groups`` / ``duplicate_members``，也不新增任何表）。
+    - ``sha256`` 是分组键，**不是**新的 Content ID / Content 实体。
+
+    字段
+    ----
+    - ``sha256``    —— 该组的字节内容哈希（64 位小写十六进制）。
+    - ``resources`` —— 组成员（``ResourceSummary``），按 ``resources.id`` 稳定升序。
+    """
+
+    sha256: str
+    resources: tuple[ResourceSummary, ...] = ()
+
+    @property
+    def member_count(self) -> int:
+        """该组的资源数（byte-duplicate 组恒 ``>= 2``）。"""
+        return len(self.resources)
+
+
+@dataclass(frozen=True)
 class ModSummary:
     """一个 MOD 的概要。
 
@@ -206,6 +233,7 @@ __all__ = [
     "LibrarySummary",
     "ResourceSummary",
     "ResourceDetail",
+    "DuplicateGroup",
     "ModUsage",
     "ResourceModRef",
     "ResourceAuthor",

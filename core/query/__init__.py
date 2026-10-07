@@ -33,6 +33,7 @@ from core.query.browse import (
 )
 from core.query.dto import (
     AuthorSummary,
+    DuplicateGroup,
     LibrarySummary,
     ModDetail,
     ModSummary,
@@ -107,6 +108,7 @@ __all__ = [
     # DTO
     "ResourceSummary",
     "ResourceDetail",
+    "DuplicateGroup",
     "ModSummary",
     "ModDetail",
     "ModUsage",

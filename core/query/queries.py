@@ -30,6 +30,7 @@ from core.database import db as database
 from core.query.card_format import card_marker_for_game
 from core.query.dto import (
     AuthorSummary,
+    DuplicateGroup,
     LibrarySummary,
     ModDetail,
     ModSummary,
@@ -711,6 +712,45 @@ class ResourceQuery:
         if isinstance(raw, list):
             return [item for item in raw if isinstance(item, str)]
         return []
+
+    # ---- byte-duplicate（只读派生；Phase 2.2）---------------------------
+
+    def duplicates(self) -> list[DuplicateGroup]:
+        """按 ``sha256`` 分组的 byte-duplicate 派生查询（只读，不落库）。
+
+        语义（Phase 2.0-C §8 / §13.7；Phase 2.2 冻结决定）
+        -------------------------------------------------
+        - **只为 byte-identical 分组**：``sha256`` 相等**仅**表示文件字节完全相同，
+          **不**表示同角色 / 同 MOD / 同逻辑资源；本方法不做任何逻辑相似性推断。
+        - **最低成员数固定为 2**：单例资源不成组、不返回（无 ``min_group_size`` 参数）。
+        - **``sha256 IS NULL`` 排除**：从未解析 / 未计算哈希的资源不参与分组。
+        - **稳定顺序**：组按 ``sha256`` 升序；组内成员按 ``resources.id`` 升序；
+          相同数据库状态下重复调用结果一致。
+        - **完全只读**：经 ``_execute_select`` 执行（继承只读护栏），
+          **不写** ``duplicate_groups`` / ``duplicate_members`` / 任何其它表，
+          不新增 schema；``sha256`` 只是分组键，不是新的 Content ID。
+        """
+        sql = (
+            f"SELECT {_RESOURCE_SUMMARY_COLUMNS}, r.sha256"
+            " FROM resources r"
+            " WHERE r.sha256 IS NOT NULL"
+            " AND r.sha256 IN ("
+            "   SELECT s.sha256 FROM resources s"
+            "   WHERE s.sha256 IS NOT NULL"
+            "   GROUP BY s.sha256"
+            "   HAVING count(*) >= 2"
+            " )"
+            " ORDER BY r.sha256 ASC, r.id ASC"
+        )
+        grouped: dict[str, list[ResourceSummary]] = {}
+        for row in _fetchall(self.conn, sql):
+            grouped.setdefault(row["sha256"], []).append(
+                _row_to_resource_summary(row)
+            )
+        return [
+            DuplicateGroup(sha256=sha256, resources=tuple(members))
+            for sha256, members in grouped.items()
+        ]
 
     # ---- review reason（只读推导）---------------------------------------
 
