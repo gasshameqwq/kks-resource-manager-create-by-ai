@@ -9,6 +9,7 @@
 - 为列表行补上**跨实体**信息：Library 名（``library_id → name``）与作者显示名。
 - 可选地按需附带 ``review_reasons``。
 - 直接转发 Library 列表与资源详情。
+- 直接转发 byte-duplicate 派生结果（供 GUI 以 ``GUI → BrowseService → Query`` 访问）。
 
 硬性约束
 --------
@@ -29,6 +30,7 @@ from dataclasses import dataclass
 
 from core.query.dto import (
     AuthorSummary,
+    DuplicateGroup,
     LibrarySummary,
     ModSummary,
     PluginSummary,
@@ -236,6 +238,25 @@ class BrowseService:
     def orphan_mods(self) -> list[ModSummary]:
         """本地已安装但没有任何资源引用的 MOD，直接复用 ``ModQuery.orphan()``。"""
         return self._mods.orphan()
+
+    # ---- byte-duplicate（只读转发，无自有 SQL；Phase 2.3-A）-------------
+
+    def duplicates(self) -> list[DuplicateGroup]:
+        """byte-identical 资源组，直接复用 ``ResourceQuery.duplicates()``。
+
+        ``sha256`` 相等**只**表示文件**字节完全相同**（byte-identical），
+        **不**表示同角色 / 同 MOD / 同逻辑资源；本层不做任何相似性推断，
+        也不改变 ``ResourceQuery.duplicates()`` 的分组语义。
+        """
+        return self._resources.duplicates()
+
+    def duplicate_group_for(self, resource_id: int) -> DuplicateGroup | None:
+        """某资源所属的 byte-duplicate 组，直接复用 ``ResourceQuery.duplicate_group_for()``。
+
+        非重复资源（单例 / ``sha256`` 为空 / 不存在）返回 ``None``；
+        语义与 :meth:`duplicates` 严格一致。
+        """
+        return self._resources.duplicate_group_for(resource_id)
 
 
 __all__ = [

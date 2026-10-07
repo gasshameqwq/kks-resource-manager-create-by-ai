@@ -74,7 +74,14 @@ class LibrarySummary:
 
 @dataclass(frozen=True)
 class ResourceSummary:
-    """资源列表行 / 概要（不含明细关系）。"""
+    """资源列表行 / 概要（不含明细关系）。
+
+    ``sha256`` 是**已有** ``resources.sha256`` 列的只读派生值（Phase 2.1 写入），
+    表示该文件**原始字节**的内容哈希；它**只**表示 byte-identical，
+    **不**表示同角色 / 同 MOD / 同逻辑资源。本 DTO **不计算**任何哈希，
+    未解析 / 未计算哈希的资源为 ``None``。为避免破坏既有构造方式，
+    该字段带默认值并置于末尾。
+    """
 
     id: int
     resource_type: str
@@ -94,6 +101,7 @@ class ResourceSummary:
     usage_count: int = 0
     plugin_count: int = 0
     author_count: int = 0
+    sha256: str | None = None
 
     @property
     def game(self) -> str | None:

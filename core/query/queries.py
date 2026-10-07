@@ -156,7 +156,7 @@ _PARSE_REASON_BY_STATUS: dict[str, str] = {
 _RESOURCE_SUMMARY_COLUMNS = """
     r.id, r.resource_type, r.name, r.display_name, r.file_path, r.relative_path,
     r.extension, r.card_marker, r.file_size, r.modified_time, r.library_id,
-    r.scan_status, r.parse_status, r.needs_review,
+    r.scan_status, r.parse_status, r.needs_review, r.sha256,
     (SELECT count(*) FROM resource_mods rm WHERE rm.resource_id = r.id) AS mod_count,
     (SELECT count(*) FROM resource_mod_usages u WHERE u.resource_id = r.id) AS usage_count,
     (SELECT count(*) FROM resource_plugins p WHERE p.resource_id = r.id) AS plugin_count,
@@ -190,6 +190,7 @@ def _row_to_resource_summary(row: sqlite3.Row) -> ResourceSummary:
         scan_status=row["scan_status"],
         parse_status=row["parse_status"],
         needs_review=bool(row["needs_review"]),
+        sha256=row["sha256"],
         mod_count=int(row["mod_count"]),
         usage_count=int(row["usage_count"]),
         plugin_count=int(row["plugin_count"]),
@@ -751,6 +752,35 @@ class ResourceQuery:
             DuplicateGroup(sha256=sha256, resources=tuple(members))
             for sha256, members in grouped.items()
         ]
+
+    def duplicate_group_for(self, resource_id: int) -> DuplicateGroup | None:
+        """该资源所属的 byte-duplicate 组；不属于任何组时返回 ``None``。
+
+        语义与 :meth:`duplicates` **严格一致**（同一 ``sha256`` 分组键、同组成员、
+        组内按 ``resources.id`` 升序）；本方法只是「单资源视角」的等价视图，
+        **不改变** ``duplicates()`` 的分组语义，也不引入任何新判据：
+
+        - ``sha256 IS NULL``（从未解析 / 未计算哈希）⇒ ``None``；
+        - 该 ``sha256`` 只有 1 个成员（非重复）⇒ ``None``；
+        - 资源不存在 ⇒ ``None``；
+        - 完全只读（经 ``_execute_select``），不落库、不新增持久化。
+        """
+        rows = _fetchall(
+            self.conn,
+            f"SELECT {_RESOURCE_SUMMARY_COLUMNS}"
+            " FROM resources r"
+            " WHERE r.sha256 IS NOT NULL"
+            " AND r.sha256 = (SELECT s.sha256 FROM resources s WHERE s.id = ?)"
+            " ORDER BY r.id ASC",
+            [resource_id],
+        )
+        if len(rows) < 2:
+            return None
+        sha256 = rows[0]["sha256"]
+        if sha256 is None:  # pragma: no cover - WHERE r.sha256 IS NOT NULL 已保证
+            return None
+        members = [_row_to_resource_summary(row) for row in rows]
+        return DuplicateGroup(sha256=sha256, resources=tuple(members))
 
     # ---- review reason（只读推导）---------------------------------------
 
