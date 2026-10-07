@@ -11,6 +11,8 @@
 - 不判断 property category（未分类的由 Query Layer 给 ``unknown``）；
 - 不解析 ``metadata_json``；
 - 不做 author normalization（交给 ``AuthorQuery``）。
+- 不计算哈希、不自己分组重复（交给 ``ResourceQuery.duplicates()``）；
+  ``sha256`` 只是既有列的只读派生值。
 
 默认人类可读输出；``--json`` 输出**来自 DTO 的稳定字段**，不序列化 SQLite cursor。
 """
@@ -80,6 +82,18 @@ def _resource_obj(r) -> dict:
         "usage_count": r.usage_count,
         "plugin_count": r.plugin_count,
         "author_count": r.author_count,
+        # Phase 2.3-A 起 ResourceSummary 携带已有的 resources.sha256（只读派生值）；
+        # 仅表示「字节完全相同」，NULL 时序列化为 null。
+        "sha256": r.sha256,
+    }
+
+
+def _duplicate_group_obj(group) -> dict:
+    """一个 byte-duplicate 组 → 稳定 JSON（``sha256`` + 成员资源对象）。"""
+    return {
+        "sha256": group.sha256,
+        "member_count": group.member_count,
+        "resources": [_resource_obj(r) for r in group.resources],
     }
 
 
@@ -221,6 +235,18 @@ def _usage_line(u) -> str:
         f"#{u.resource_id:>3}  {u.mod_guid:<40} {u.category:<9} {u.property}"
         f"  slot={u.slot} local={u.local_slot} cat={u.category_no}"
     )
+
+
+def _duplicate_group_lines(group) -> list[str]:
+    """一个 byte-duplicate 组的人类可读块（成员显示 id / 类型 / 标题 / 路径）。"""
+    lines = [
+        f"sha256 {group.sha256}    members={group.member_count}"
+        "    （以下资源文件字节完全相同）"
+    ]
+    for resource in group.resources:
+        lines.append(f"  {_resource_line(resource)}")
+        lines.append(f"      {resource.file_path}")
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -515,6 +541,29 @@ def cmd_orphan_mods(conn, args) -> int:
     return 0
 
 
+def cmd_duplicates(conn, args) -> int:
+    """``query duplicates``：按 ``sha256`` 分组的 byte-duplicate 资源组。
+
+    数据全部来自 ``ResourceQuery.duplicates()``（只读派生查询）；
+    CLI 不拼 SQL、不重新分组、不计算哈希。
+
+    语义边界（Phase 2.0-C §5.4 / §8 / §13.7）：``sha256`` 相等**只**表示
+    文件**字节完全相同**（byte-identical），**不**表示同角色 / 同 MOD /
+    同逻辑资源；本命令不提供 canonical / primary / status / dismiss 等概念。
+    """
+    groups = ResourceQuery(conn).duplicates()
+    payload = {
+        "count": len(groups),
+        "groups": [_duplicate_group_obj(g) for g in groups],
+    }
+    lines = [f"Byte-duplicate groups: {len(groups)}"]
+    for group in groups:
+        lines.append("")
+        lines.extend(_duplicate_group_lines(group))
+    _emit(args, payload, "\n".join(lines) if groups else None)
+    return 0
+
+
 def cmd_usages(conn, args) -> int:
     resource_id = None
     if args.resource is not None:
@@ -605,6 +654,7 @@ _HANDLERS = {
     "plugin-resources": cmd_plugin_resources,
     "missing-mods": cmd_missing_mods,
     "orphan-mods": cmd_orphan_mods,
+    "duplicates": cmd_duplicates,
     "usages": cmd_usages,
     "usage-categories": cmd_usage_categories,
     "unknown-properties": cmd_unknown_properties,
@@ -698,6 +748,12 @@ def add_query_parser(sub) -> None:
 
     qsub.add_parser("missing-mods", parents=[common], help="被引用但本地未安装的 MOD")
     qsub.add_parser("orphan-mods", parents=[common], help="本地已安装但无人引用的 MOD")
+
+    qsub.add_parser(
+        "duplicates",
+        parents=[common],
+        help="字节完全相同的资源组（byte-duplicate，只读派生；不含语义等价判断）",
+    )
 
     usages = qsub.add_parser("usages", parents=[common], help="全库 usage 查询")
     usages.add_argument("--resource", default=None, help="限定资源（id/路径）")

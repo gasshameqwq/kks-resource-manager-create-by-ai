@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import main as cli  # noqa: E402
+import cli_query as cli_query_module  # noqa: E402
 from core.database import db as database  # noqa: E402
 from core.library import LibraryStore  # noqa: E402
 from core.query import ModQuery, ResourceQuery  # noqa: E402
@@ -287,6 +289,7 @@ def test_cli_does_not_modify_database(cli_lib, capsys):
         ["query", "mods"],
         ["query", "missing-mods"],
         ["query", "orphan-mods"],
+        ["query", "duplicates"],
         ["query", "usage-categories"],
         ["query", "unknown-properties"],
         ["query", "usages", "--limit", "3"],
@@ -294,6 +297,182 @@ def test_cli_does_not_modify_database(cli_lib, capsys):
         assert cli.main(argv) == 0
     capsys.readouterr()
     assert _sha256(db_file) == before, "CLI 查询不得修改数据库"
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.3-B：byte-duplicate CLI surfacing
+# ---------------------------------------------------------------------------
+
+
+_RESOURCE_JSON_KEYS = {
+    "id",
+    "resource_type",
+    "name",
+    "display_name",
+    "title",
+    "game",
+    "card_marker",
+    "file_path",
+    "relative_path",
+    "extension",
+    "file_size",
+    "modified_time",
+    "library_id",
+    "scan_status",
+    "parse_status",
+    "needs_review",
+    "mod_count",
+    "usage_count",
+    "plugin_count",
+    "author_count",
+    "sha256",
+}
+
+
+@pytest.fixture()
+def cli_dup(tmp_path: Path, monkeypatch) -> Path:
+    """重定向数据目录；造出恰好 1 组 byte-duplicate（两文件字节完全相同）+ 1 个单例。"""
+    data_dir = tmp_path / "appdata_dup"
+    monkeypatch.setenv("KKS_RM_DATA_DIR", str(data_dir))
+    root = tmp_path / "lib_dup"
+    sub = root / "sub"
+    sub.mkdir(parents=True)
+    builders.write_card(root / "sameA.png", lastname="Same", firstname="Dup")
+    builders.write_card(sub / "sameB.png", lastname="Same", firstname="Dup")
+    builders.write_card(root / "unique.png", lastname="Only", firstname="Solo")
+    assert cli.main(["library", "add", str(root)]) == 0
+    assert cli.main(["scan"]) == 0
+    return data_dir
+
+
+def test_query_duplicates_default_output(cli_dup, capsys):
+    """``query duplicates`` 默认输出：分组哈希、成员数、成员的 id / 标题 / 路径。"""
+    capsys.readouterr()
+    assert cli.main(["query", "duplicates"]) == 0
+    out = capsys.readouterr().out
+    assert "Byte-duplicate groups: 1" in out
+    assert "members=2" in out
+    assert "字节完全相同" in out
+    assert "sameA.png" in out and "sameB.png" in out
+    assert "unique.png" not in out, "单例资源不得出现在重复组里"
+
+
+def test_query_duplicates_json_shape(cli_dup, capsys):
+    """``query duplicates --json``：稳定结构 {count, groups:[{sha256, member_count, resources}]}。"""
+    capsys.readouterr()
+    assert cli.main(["query", "duplicates", "--json"]) == 0
+    payload = _json_out(capsys)
+    assert set(payload) == {"count", "groups"}
+    assert payload["count"] == 1
+    group = payload["groups"][0]
+    assert set(group) == {"sha256", "member_count", "resources"}
+    assert group["member_count"] == 2 == len(group["resources"])
+    assert re.fullmatch(r"[0-9a-f]{64}", group["sha256"])
+    for resource in group["resources"]:
+        assert _RESOURCE_JSON_KEYS <= set(resource)
+        assert resource["sha256"] == group["sha256"]
+
+
+def test_query_duplicates_matches_query_layer_dto(cli_dup, capsys):
+    """JSON 必须与 Query Layer 的 DuplicateGroup 数据一致（CLI 不自己分组）。"""
+    conn = database.connect(cli_dup / "kks_resource_manager.db")
+    try:
+        expected = ResourceQuery(conn).duplicates()
+    finally:
+        conn.close()
+
+    capsys.readouterr()
+    assert cli.main(["query", "duplicates", "--json"]) == 0
+    payload = _json_out(capsys)
+
+    assert payload["count"] == len(expected) == 1
+    assert [g["sha256"] for g in payload["groups"]] == [g.sha256 for g in expected]
+    assert [g["member_count"] for g in payload["groups"]] == [
+        g.member_count for g in expected
+    ]
+    assert [[r["id"] for r in g["resources"]] for g in payload["groups"]] == [
+        [r.id for r in g.resources] for g in expected
+    ]
+
+
+def test_query_duplicates_members_are_byte_identical(cli_dup, capsys):
+    """组成员确实是同一份字节（文件 sha256 与组键一致）。"""
+    capsys.readouterr()
+    assert cli.main(["query", "duplicates", "--json"]) == 0
+    group = _json_out(capsys)["groups"][0]
+    paths = {Path(r["file_path"]) for r in group["resources"]}
+    assert {p.name for p in paths} == {"sameA.png", "sameB.png"}
+    assert {_sha256(p) for p in paths} == {group["sha256"]}
+
+
+def test_query_duplicates_empty_when_no_duplicates(cli_lib, capsys):
+    """没有 byte-duplicate 时：JSON 返回空列表，人类可读给出合理提示，不报错。"""
+    capsys.readouterr()
+    assert cli.main(["query", "duplicates", "--json"]) == 0
+    assert _json_out(capsys) == {"count": 0, "groups": []}
+
+    capsys.readouterr()
+    assert cli.main(["query", "duplicates"]) == 0
+    assert "no results" in capsys.readouterr().out.lower()
+
+
+def test_query_duplicates_excludes_null_sha256(cli_dup, capsys):
+    """``sha256 IS NULL`` 的资源不参与分组；组因此只剩 1 人 ⇒ 不成组。"""
+    conn = database.connect(cli_dup / "kks_resource_manager.db")
+    try:
+        row = conn.execute(
+            "SELECT id FROM resources WHERE file_path LIKE '%sameB.png'"
+        ).fetchone()
+        assert row is not None
+        conn.execute("UPDATE resources SET sha256 = NULL WHERE id = ?", (row["id"],))
+        conn.commit()
+    finally:
+        conn.close()
+
+    capsys.readouterr()
+    assert cli.main(["query", "duplicates", "--json"]) == 0
+    assert _json_out(capsys) == {"count": 0, "groups": []}
+
+
+def test_query_resource_json_includes_sha256(cli_lib, capsys):
+    """``query resource --json`` 新增 sha256（且既有字段全部保留）。"""
+    capsys.readouterr()
+    assert cli.main(["query", "resource", "cardA.png", "--json"]) == 0
+    resource = _json_out(capsys)["resource"]
+    assert resource["sha256"] == _sha256(Path(resource["file_path"]))
+    assert _RESOURCE_JSON_KEYS <= set(resource)
+
+
+def test_query_resources_json_includes_sha256(cli_lib, capsys):
+    """``query resources --json`` 每行新增 sha256（additive-only）。"""
+    capsys.readouterr()
+    assert cli.main(["query", "resources", "--json"]) == 0
+    payload = _json_out(capsys)
+    assert payload["count"] == 9
+    for resource in payload["resources"]:
+        assert _RESOURCE_JSON_KEYS <= set(resource)
+        assert re.fullmatch(r"[0-9a-f]{64}", resource["sha256"])
+
+
+def test_query_duplicates_does_not_modify_database(cli_dup, capsys):
+    """``query duplicates`` 前后数据库字节完全一致（只读）。"""
+    db_file = cli_dup / "kks_resource_manager.db"
+    before = _sha256(db_file)
+    capsys.readouterr()
+    assert cli.main(["query", "duplicates"]) == 0
+    assert cli.main(["query", "duplicates", "--json"]) == 0
+    capsys.readouterr()
+    assert _sha256(db_file) == before, "CLI 查询不得修改数据库"
+
+
+def test_cli_has_no_sql_and_no_sqlite_access():
+    """架构约束（静态）：CLI 不直接访问 sqlite3、不自带 SQL、不自己分组。"""
+    source = Path(cli_query_module.__file__).read_text(encoding="utf-8")
+    assert "sqlite3" not in source, "CLI 不得直接访问 sqlite3"
+    assert not re.search(
+        r"\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|GROUP BY)\b", source
+    ), "CLI 不得自己写 SQL / 自己分组"
+    assert "duplicates()" in source, "重复查询必须复用 Query Layer"
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +578,7 @@ def test_sample_cli_does_not_modify_database(sample_cli, capsys):
         ["query", "plugins"],
         ["query", "missing-mods"],
         ["query", "orphan-mods"],
+        ["query", "duplicates"],
         ["query", "usage-categories"],
     ):
         assert cli.main(argv) == 0
