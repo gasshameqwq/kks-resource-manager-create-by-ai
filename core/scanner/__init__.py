@@ -9,7 +9,9 @@
 - **只读**：绝不修改 / 移动 / 重命名 / 删除用户文件，也不写缓存文件。
 - **不自动删除**：文件消失只标记 ``scan_status='missing'``，不删行、更不删文件。
 - **失败隔离**：每个文件一个事务，单文件失败不影响同批其它文件。
-- **不做全量 SHA256**：增量只比较 ``(file_path_key, file_size, modified_time)``。
+- **内容哈希与解析同频（Phase 2.1）**：增量门仍是 ``(file_path_key, file_size,
+  modified_time)``；只有新增 / 变化 / ``mode='full'`` 的文件才解析并计算
+  ``resources.sha256``（见 ``core.scanner.hashing``）。读取窗口内文件变化则不提交。
 """
 
 from core.scanner.models import (
@@ -24,6 +26,7 @@ from core.scanner.models import (
     ScanResult,
     ScanStats,
 )
+from core.scanner.hashing import sha256_of_file
 from core.scanner.scanner import CANDIDATE_SUFFIXES, LibraryScanner, iter_candidates
 from core.scanner.store import (
     OUTCOME_INSERTED,
@@ -36,6 +39,7 @@ __all__ = [
     "LibraryScanner",
     "iter_candidates",
     "CANDIDATE_SUFFIXES",
+    "sha256_of_file",
     "ResourceStore",
     "build_card_metadata",
     "OUTCOME_INSERTED",

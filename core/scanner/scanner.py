@@ -19,7 +19,9 @@
 - **只读**：绝不修改、移动、重命名、删除用户的文件；也不写任何缓存文件。
 - **不自行解析**：文件类型完全由 Parser 决定，不看文件名/目录名/大小。
 - **失败隔离**：每个文件一个事务，一个文件失败不影响同批其它文件。
-- **不做全量 SHA256**：增量只比较 ``(path_key, size, mtime)``。
+- **内容哈希与解析同频（Phase 2.1）**：增量未变的文件跳过（不读文件、不算哈希）；
+  新增 / ``(size, mtime)`` 变化 / ``mode='full'`` 才解析并计算 ``resources.sha256``。
+  读取窗口内 ``(size, mtime)`` 变化则本次结果整体不提交（C7），下次扫描重来。
 - **不自动删除**：文件消失只标记 ``scan_status='missing'``，绝不删行、更不删文件。
 """
 
@@ -33,6 +35,7 @@ from pathlib import Path
 from core.database import db as database
 from core.library import LibraryStore
 from core.parsers import parse_card, parse_zipmod
+from core.scanner.hashing import sha256_of_file
 from core.scanner.models import (
     RESULT_SKIPPED,
     SCAN_COMPLETED,
@@ -192,6 +195,37 @@ class LibraryScanner:
             )
             return
 
+        # ---- Phase 2.1：同一次稳定读取窗口内计算 SHA-256（C7）----
+        # 读取窗口 = stat_before（本函数开头的 ``stat``）→ parse → sha256 → stat_after。
+        # 窗口内 size / mtime 变化 ⇒ 本次解析结果与 sha256 整体不提交，下次扫描重来。
+        sha256: str | None = None
+        if parsed.success:
+            try:
+                sha256 = sha256_of_file(path)
+            except OSError as exc:
+                stats.failed += 1
+                issues.append(
+                    ScanIssue(str(path), STAGE_IO, f"无法读取文件内容：{exc}")
+                )
+                return
+
+        try:
+            stat_after = path.stat()
+        except OSError as exc:
+            stats.failed += 1
+            issues.append(
+                ScanIssue(str(path), STAGE_IO, f"无法读取文件信息：{exc}")
+            )
+            return
+
+        if (
+            int(stat_after.st_size) != size
+            or abs(float(stat_after.st_mtime) - modified_time) >= _MTIME_EPSILON
+        ):
+            # C7：文件在读取窗口内被改写 → 不写库、不开事务、不计失败、
+            # 不加 issue、不调用 mark_parse_failed，保持数据库中既有状态。
+            return
+
         if not parsed.success:
             stats.failed += 1
             stage = STAGE_NOT_A_RESOURCE if suffix == ".png" else STAGE_PARSE
@@ -206,6 +240,7 @@ class LibraryScanner:
                 self.store.mark_parse_failed(int(existing["id"]), parsed.error)
             return
 
+        assert sha256 is not None, "parsed.success 时 sha256 必须已在窗口内计算"
         relative_path = self._relative_path(path, root_path)
         # 作者取自 Parser 的**原始列表**（含 [Unknown] 之类的哨兵）；
         # 哨兵过滤与去重由 store 侧的 partition_authors 负责。
@@ -224,6 +259,7 @@ class LibraryScanner:
                         modified_time=modified_time,
                         parsed=parsed,
                         authors_raw=authors_raw,
+                        sha256=sha256,
                     )
                 else:
                     _resource_id, outcome = self.store.upsert_mod_resource(
@@ -234,6 +270,7 @@ class LibraryScanner:
                         size=size,
                         modified_time=modified_time,
                         parsed=parsed,
+                        sha256=sha256,
                     )
         except Exception as exc:  # noqa: BLE001 - 单文件回滚，批次继续
             stats.failed += 1

@@ -104,6 +104,7 @@ class ResourceStore:
         size: int,
         modified_time: float,
         parsed: CharacterCardParseResult,
+        sha256: str,
         authors_raw: list[str] | None = None,
     ) -> tuple[int, str]:
         """写入/更新一张卡片，并重建它的关系。返回 (resource_id, outcome)。"""
@@ -117,9 +118,10 @@ class ResourceStore:
                 "INSERT INTO resources("
                 " resource_type, type_source, library_id, name, display_name,"
                 " file_path, file_path_key, relative_path, file_size, modified_time,"
+                " sha256,"
                 " extension, parse_status, parse_error, card_marker, metadata_json,"
                 " scan_status, needs_review, last_scanned_at)"
-                " VALUES (?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
+                " VALUES (?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
                 " 'present', ?, datetime('now'))",
                 (
                     resource_type,
@@ -131,6 +133,7 @@ class ResourceStore:
                     relative_path,
                     size,
                     modified_time,
+                    sha256,
                     path.suffix.lower(),
                     parsed.parse_status,
                     parsed.error,
@@ -153,7 +156,8 @@ class ResourceStore:
             self.conn.execute(
                 "UPDATE resources SET library_id = ?, resource_type = ?, name = ?,"
                 " display_name = ?, file_path = ?, relative_path = ?, file_size = ?,"
-                " modified_time = ?, extension = ?, parse_status = ?, parse_error = ?,"
+                " modified_time = ?, sha256 = ?, extension = ?, parse_status = ?,"
+                " parse_error = ?,"
                 " card_marker = ?, metadata_json = ?, scan_status = 'present',"
                 " needs_review = ?, updated_at = datetime('now'),"
                 " last_scanned_at = datetime('now')"
@@ -167,6 +171,7 @@ class ResourceStore:
                     relative_path,
                     size,
                     modified_time,
+                    sha256,
                     path.suffix.lower(),
                     parsed.parse_status,
                     parsed.error,
@@ -195,6 +200,7 @@ class ResourceStore:
         size: int,
         modified_time: float,
         parsed: ZipmodParseResult,
+        sha256: str,
     ) -> tuple[int, str]:
         """写入/更新一个 zipmod（resources + mods）。返回 (resource_id, outcome)。"""
         display = parsed.name or parsed.guid
@@ -204,8 +210,9 @@ class ResourceStore:
                 "INSERT INTO resources("
                 " resource_type, type_source, library_id, name, display_name,"
                 " file_path, file_path_key, relative_path, file_size, modified_time,"
-                " extension, parse_status, scan_status, needs_review, last_scanned_at)"
-                " VALUES ('mod', 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', 0,"
+                " sha256, extension, parse_status, scan_status, needs_review,"
+                " last_scanned_at)"
+                " VALUES ('mod', 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'present', 0,"
                 " datetime('now'))",
                 (
                     library_id,
@@ -216,6 +223,7 @@ class ResourceStore:
                     relative_path,
                     size,
                     modified_time,
+                    sha256,
                     path.suffix.lower(),
                     parsed.parse_status,
                 ),
@@ -235,7 +243,8 @@ class ResourceStore:
             self.conn.execute(
                 "UPDATE resources SET library_id = ?, resource_type = ?, name = ?,"
                 " display_name = ?, file_path = ?, relative_path = ?, file_size = ?,"
-                " modified_time = ?, extension = ?, parse_status = ?, parse_error = NULL,"
+                " modified_time = ?, sha256 = ?, extension = ?, parse_status = ?,"
+                " parse_error = NULL,"
                 " scan_status = 'present', updated_at = datetime('now'),"
                 " last_scanned_at = datetime('now') WHERE id = ?",
                 (
@@ -247,6 +256,7 @@ class ResourceStore:
                     relative_path,
                     size,
                     modified_time,
+                    sha256,
                     path.suffix.lower(),
                     parsed.parse_status,
                     resource_id,
