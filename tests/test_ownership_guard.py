@@ -30,9 +30,23 @@ ALLOWED_RESOURCE_WRITERS = {
     "core/app/resource_write.py",  # user writer（Phase 3.1 唯一用户写入口）
 }
 
+#: Phase 3.2：唯一允许对 `tags` / `resource_tags` 执行 INSERT / UPDATE / DELETE 的模块。
+ALLOWED_TAG_WRITERS = {
+    "core/app/tag_write.py",      # Tag 域唯一 runtime writer
+}
+
 #: 精确匹配「对 resources 表的写入」，不会误伤 `resources_fts`。
+#: 接受 `INSERT [OR ...] INTO` 形式（收紧既有护栏）。
 _RESOURCE_WRITE_RE = re.compile(
-    r"INSERT\s+INTO\s+resources\s*\(|UPDATE\s+resources\s+SET\b",
+    r"INSERT\s+(?:OR\s+\w+\s+)?INTO\s+resources\s*\(|UPDATE\s+resources\s+SET\b",
+    re.IGNORECASE,
+)
+
+#: 匹配「对 tags / resource_tags 表的写入」（含 `INSERT OR IGNORE` 形式）。
+_TAG_WRITE_RE = re.compile(
+    r"INSERT\s+(?:OR\s+\w+\s+)?INTO\s+(?:tags|resource_tags)\s*\("
+    r"|UPDATE\s+(?:tags|resource_tags)\s+SET\b"
+    r"|DELETE\s+FROM\s+(?:tags|resource_tags)\b",
     re.IGNORECASE,
 )
 
@@ -132,3 +146,69 @@ def test_scanner_insert_keeps_type_source_auto(scan_env):
 
     row = conn.execute("SELECT type_source FROM resources").fetchone()
     assert row["type_source"] == "auto"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.2：Tag 表写路径护栏（tags / resource_tags 只允许 TagWriteService）
+# ---------------------------------------------------------------------------
+
+
+def test_only_tag_write_service_writes_tag_tables():
+    offenders: list[str] = []
+    for path in _scanned_sources():
+        if _TAG_WRITE_RE.search(path.read_text(encoding="utf-8")):
+            relative = path.relative_to(REPO).as_posix()
+            if relative not in ALLOWED_TAG_WRITERS:
+                offenders.append(relative)
+    assert offenders == [], (
+        "只有 TagWriteService 可以写 tags / resource_tags，违规文件："
+        + ", ".join(offenders)
+    )
+
+
+def test_tag_guard_actually_matches_tag_write_service():
+    """正向证据：护栏确实能命中 TagWriteService 的写入（防正则写错假通过）。"""
+    source = (REPO / "core/app/tag_write.py").read_text(encoding="utf-8")
+    assert _TAG_WRITE_RE.search(source), "护栏必须能命中 TagWriteService 的写入语句"
+
+
+def test_scanner_executed_sql_never_writes_tag_tables(scan_env):
+    """Scanner 重扫（INSERT + UPDATE 两条路径）不得写 `tags` / `resource_tags`。"""
+    conn, root, library = scan_env
+    card = write_card(root / "card.png", lastname="Alice", firstname="Card")
+    write_zipmod(root / "mod.zipmod", "com.example.x")
+    scanner = LibraryScanner(conn)
+
+    statements: list[str] = []
+    conn.set_trace_callback(statements.append)
+    try:
+        scanner.scan(library.id)
+        write_card(card, lastname="Renamed", firstname="Character")
+        scanner.scan(library.id)
+    finally:
+        conn.set_trace_callback(None)
+
+    for sql in statements:
+        assert not _TAG_WRITE_RE.search(sql), f"Scanner 写了 Tag 表：{sql}"
+
+
+def test_rescan_preserves_resource_tags(scan_env):
+    """重扫不得删除用户 Tag 关联（资源行不删、机器 writer 不碰 Tag 表）。"""
+    from core.app import TagWriteService
+
+    conn, root, library = scan_env
+    card = write_card(root / "card.png", lastname="Alice", firstname="Card")
+    scanner = LibraryScanner(conn)
+    scanner.scan(library.id)
+    resource_id = int(conn.execute("SELECT id FROM resources").fetchone()["id"])
+
+    service = TagWriteService(conn)
+    tag_id = service.create_tag("Cute")
+    service.assign_tag(resource_id, tag_id)
+    service.set_favorite(resource_id, True)
+
+    write_card(card, lastname="Renamed", firstname="Character")
+    scanner.scan(library.id)
+
+    assert conn.execute("SELECT count(*) AS c FROM resource_tags").fetchone()["c"] == 2
+    assert conn.execute("SELECT count(*) AS c FROM tags").fetchone()["c"] == 2

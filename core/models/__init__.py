@@ -8,6 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from core.models.tags import (
+    FAVORITE_TAG_KEY,
+    RESERVED_SYSTEM_TAG_KEYS,
+    SYSTEM_TAGS,
+    SystemTagSpec,
+    is_system_tag_key,
+)
+
 # 资源类型（与 schema 中 resources.resource_type 的 CHECK 约束保持一致）
 RESOURCE_TYPES: tuple[str, ...] = (
     "character_card",
@@ -158,6 +166,12 @@ __all__ = [
     "UNKNOWN_AUTHOR_SENTINEL",
     "is_placeholder_author",
     "partition_authors",
+    # Tag 领域（Phase 3.2）
+    "FAVORITE_TAG_KEY",
+    "SystemTagSpec",
+    "SYSTEM_TAGS",
+    "RESERVED_SYSTEM_TAG_KEYS",
+    "is_system_tag_key",
     "Library",
     "Resource",
     "ModEntry",

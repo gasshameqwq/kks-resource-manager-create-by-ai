@@ -153,6 +153,30 @@ class ResourceSummary:
 
 
 @dataclass(frozen=True)
+class TagSummary:
+    """一个 Tag 的只读概要（Phase 3.2）。
+
+    依据 `docs/phase3/PHASE3_2_IMPLEMENTATION_CONTRACT.md`（§7.3 / §8 / §9）：
+
+    - ``id`` / ``name`` / ``name_key``：Tag 身份与展示文本；
+    - ``color`` / ``category``：**现有 metadata**，不承载 taxonomy / classification 语义；
+    - ``is_system``：**派生值**（``name_key`` 属于保留系统 key），不是持久列；
+    - ``resource_count``：**读取时**由 ``resource_tags`` 聚合得到的 derived value，
+      **不落库、不缓存**。
+
+    本 DTO 不含任何写能力；Tag 写入只经 ``core.app.TagWriteService``。
+    """
+
+    id: int
+    name: str
+    name_key: str
+    color: str | None
+    category: str | None
+    is_system: bool
+    resource_count: int = 0
+
+
+@dataclass(frozen=True)
 class ModUsage:
     """一条逐槽位使用事实（``resource_mod_usages`` 的一行）。"""
 
@@ -197,6 +221,8 @@ class ResourceDetail:
     plugins: tuple[str, ...] = ()
     authors: tuple[ResourceAuthor, ...] = ()
     metadata: dict = field(default_factory=dict)
+    tags: tuple[TagSummary, ...] = ()
+    is_favorite: bool = False
 
 
 @dataclass(frozen=True)
@@ -279,6 +305,7 @@ __all__ = [
     "LibrarySummary",
     "ResourceSummary",
     "ResourceDetail",
+    "TagSummary",
     "DuplicateGroup",
     "ModUsage",
     "ResourceModRef",

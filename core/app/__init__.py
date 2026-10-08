@@ -20,6 +20,15 @@ from core.app.resource_write import (
     ResourceWriteError,
     ResourceWriteService,
 )
+from core.app.tag_write import (
+    InvalidTagValue,
+    ReservedTagName,
+    SystemTagImmutable,
+    TagNameConflict,
+    TagNotFound,
+    TagWriteError,
+    TagWriteService,
+)
 
 __all__ = [
     "LibraryAdminService",
@@ -28,4 +37,11 @@ __all__ = [
     "ResourceWriteError",
     "ResourceNotFound",
     "InvalidResourceValue",
+    "TagWriteService",
+    "TagWriteError",
+    "TagNotFound",
+    "TagNameConflict",
+    "ReservedTagName",
+    "SystemTagImmutable",
+    "InvalidTagValue",
 ]

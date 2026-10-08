@@ -46,6 +46,7 @@ from core.query.dto import (
     ResourceModRef,
     ResourceSummary,
     ReviewReason,
+    TagSummary,
 )
 from core.query.property_map import (
     ALL_PROPERTY_TOKENS,
@@ -90,6 +91,7 @@ from core.query.search import (
     normalize_query,
     plan_search,
 )
+from core.query.tag_queries import TagQuery
 
 __all__ = [
     # Browse Read Model（Phase 1.4-B.3）
@@ -104,6 +106,7 @@ __all__ = [
     "AuthorQuery",
     "PluginQuery",
     "UsageQuery",
+    "TagQuery",
     "ReadOnlyViolation",
     # DTO
     "ResourceSummary",
@@ -120,6 +123,7 @@ __all__ = [
     "PropertyCategoryStats",
     "ReviewReason",
     "LibrarySummary",
+    "TagSummary",
     # review reason（只读推导）
     "REVIEW_REASON_CODES",
     "REVIEW_REASON_PARSE_FAILED",

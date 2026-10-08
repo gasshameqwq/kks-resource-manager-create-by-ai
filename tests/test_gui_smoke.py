@@ -390,6 +390,7 @@ def test_ui_does_not_bypass_query_layer() -> None:
         joined = "\n".join(import_lines)
         assert "ResourceQuery" not in joined, f"{path.name} 不得直接用 ResourceQuery"
         assert "LibraryQuery" not in joined, f"{path.name} 不得直接用 LibraryQuery"
+        assert "TagQuery" not in joined, f"{path.name} 不得直接用 TagQuery"
         # C-3 起允许在 ui/ 使用 PreviewService / QThreadPool，但生成只能在 worker 里
         if path.name != "preview_worker.py":
             assert "get_or_generate" not in source, (

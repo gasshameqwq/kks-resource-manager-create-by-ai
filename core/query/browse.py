@@ -37,6 +37,7 @@ from core.query.dto import (
     ResourceDetail,
     ResourceSummary,
     ReviewReason,
+    TagSummary,
 )
 from core.query.queries import (
     AuthorQuery,
@@ -45,6 +46,7 @@ from core.query.queries import (
     PluginQuery,
     ResourceQuery,
 )
+from core.query.tag_queries import TagQuery
 
 
 @dataclass(frozen=True)
@@ -135,6 +137,7 @@ class BrowseService:
         self._authors = AuthorQuery(conn)
         self._plugins = PluginQuery(conn)
         self._mods = ModQuery(conn)
+        self._tags = TagQuery(conn)
 
     # ---- 左栏：Library --------------------------------------------------
 
@@ -257,6 +260,28 @@ class BrowseService:
         语义与 :meth:`duplicates` 严格一致。
         """
         return self._resources.duplicate_group_for(resource_id)
+
+    # ---- Tag（只读转发，Phase 3.2；无自有 SQL）--------------------------
+
+    def tags(self) -> list[TagSummary]:
+        """全部 Tag（含系统 Tag），直接复用 ``TagQuery.list()``。"""
+        return self._tags.list()
+
+    def resource_tags(self, resource_id: int) -> list[TagSummary]:
+        """某个资源上的 Tag，直接复用 ``TagQuery.for_resource()``。"""
+        return self._tags.for_resource(resource_id)
+
+    def system_tags(self) -> list[TagSummary]:
+        """保留系统 Tag 子集，直接复用 ``TagQuery.system_tags()``。"""
+        return self._tags.system_tags()
+
+    def is_favorite(self, resource_id: int) -> bool:
+        """该资源是否收藏，直接复用 ``TagQuery.is_favorite()``。"""
+        return self._tags.is_favorite(resource_id)
+
+    def favorite_resource_ids(self) -> list[int]:
+        """全部收藏资源 id，直接复用 ``TagQuery.favorite_resource_ids()``。"""
+        return self._tags.favorite_resource_ids()
 
 
 __all__ = [

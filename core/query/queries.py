@@ -27,6 +27,7 @@ import sqlite3
 from collections.abc import Sequence
 
 from core.database import db as database
+from core.models.tags import FAVORITE_TAG_KEY
 from core.query.card_format import card_marker_for_game
 from core.query.dto import (
     AuthorSummary,
@@ -56,6 +57,11 @@ from core.query.search import (
     like_pattern,
     plan_search,
 )
+from core.query.readonly import (
+    ReadOnlyViolation,
+    _execute_select,
+)
+from core.query.tag_queries import TagQuery
 
 
 # ---------------------------------------------------------------------------
@@ -63,24 +69,12 @@ from core.query.search import (
 # ---------------------------------------------------------------------------
 
 
-class ReadOnlyViolation(RuntimeError):
-    """查询层只允许只读语句（SELECT / WITH）。"""
-
-
-_ALLOWED_KEYWORDS = ("select", "with")
-
-
-def _execute_select(
-    conn: sqlite3.Connection, sql: str, params: Sequence[object] = ()
-) -> sqlite3.Cursor:
-    """执行一条只读语句；非 SELECT/WITH 一律拒绝。"""
-    statement = sql.lstrip()
-    keyword = statement.split(None, 1)[0].lower() if statement else ""
-    if keyword not in _ALLOWED_KEYWORDS:
-        raise ReadOnlyViolation(
-            f"查询层只允许 SELECT / WITH 语句，收到：{keyword or '<空>'}!"
-        )
-    return conn.execute(sql, tuple(params))
+# 只读护栏：``ReadOnlyViolation`` / ``_execute_select`` 由 ``core.query.readonly``
+# 提供（模块顶部已导入），使 ``tag_queries`` 能复用同一护栏而不产生反向 import。
+#
+# ``_fetchall`` / ``_fetchone`` 仍**在本模块定义**：它们引用本模块的 ``_execute_select``
+# 名字，从而保留既有「monkeypatch ``queries._execute_select`` 观察只读护栏」的测试点
+# （见 tests/test_duplicate_query.py / tests/test_query_surfacing.py）。
 
 
 def _fetchall(
@@ -614,10 +608,15 @@ class ResourceQuery:
         return self.summary(int(row["id"])) if row is not None else None
 
     def get(self, resource_id: int) -> ResourceDetail | None:
-        """单资源详情（概要 + usages + mods + plugins + authors + metadata）。"""
+        """单资源详情（概要 + usages + mods + plugins + authors + metadata + tags）。
+
+        Phase 3.2 起**只读**填充用户 Tag 事实（``tags``）与派生 Favorite 状态
+        （``is_favorite``）；不写库，也不提供任何 Tag 过滤 / 搜索语义。
+        """
         summary = self.summary(resource_id)
         if summary is None:
             return None
+        tags = tuple(TagQuery(self.conn).for_resource(resource_id))
         return ResourceDetail(
             resource=summary,
             usages=tuple(self.usages(resource_id)),
@@ -625,6 +624,8 @@ class ResourceQuery:
             plugins=tuple(self.plugins(resource_id)),
             authors=tuple(self.authors(resource_id)),
             metadata=self.metadata(resource_id),
+            tags=tags,
+            is_favorite=any(tag.name_key == FAVORITE_TAG_KEY for tag in tags),
         )
 
     def usages(
