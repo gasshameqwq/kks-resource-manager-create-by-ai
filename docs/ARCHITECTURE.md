@@ -1,6 +1,7 @@
 # KKS Resource Manager — 架构文档
 
-> 版本：Phase 1.1（Library 管理） · schema v1 · 2026-10-06
+> 版本：Phase 3.2 基线（Tag System 已 CLOSED / PASS） · schema v2 · 2026-10-10
+> 本文件只描述**当前有效**的架构；各阶段状态与权威文档入口见 `docs/PROJECT_STATE.md`。
 
 本文档描述系统的分层、数据模型与关键技术决策。Phase 0 交付了本文档、
 项目骨架与 SQLite schema；Phase 1 起按 §10 的路线图逐个小步实现功能。
@@ -81,15 +82,20 @@ kks-resource-manager/
 │   │   ├── models.py          # CharacterCardParseResult / ZipmodParseResult
 │   │   ├── card.py            # KKS/KK 卡片：PNG + msgpack 尾部
 │   │   └── zipmod.py          # ZIPMOD：manifest.xml → guid/name/author/version
-│   ├── mod/                   # zipmod manifest / GUID 索引 / 依赖（Phase 2）
-│   ├── thumbnails/            # 缩略图缓存（Phase 1）
-│   ├── duplicate/             # 重复检测（Phase 4）
-│   └── classification/        # 识别优先级 Level 1–4（Phase 1 起）
+│   ├── mod/                   # 空壳模块（MOD manifest / GUID 实际在 parsers/zipmod.py）
+│   ├── thumbnails/            # 缩略图缓存（只写 data/thumbnail_cache/）
+│   ├── duplicate/             # 空壳模块（byte-duplicate 为 Query 层只读派生）
+│   └── classification/        # 识别优先级 Level 1–4
 ├── ui/                        # 界面层：只调用 core/，不含业务逻辑
-│   ├── main_window.py         # Phase 0 占位；Phase 1 实现
-│   ├── pages/                 # 资源库 / 浏览器 / 详情 / 待确认（Phase 1+）
-│   ├── dialogs/
-│   └── widgets/
+│   ├── main_window.py         # 主窗口（三栏；Phase 1.4 起）
+│   ├── browser_panel.py       # 资源浏览（网格 + 有界加载更多）
+│   ├── filter_bar.py          # 搜索 / 筛选 / 排序
+│   ├── detail_panel.py        # 只读资源详情
+│   ├── library_panel.py       # Library 管理（Phase 1.5-A）
+│   ├── library_admin_dialog.py
+│   ├── resource_model.py      # 行模型（展示名委托 core DTO）
+│   ├── preview_worker.py      # 异步缩略图 worker
+│   └── scan_worker.py         # 后台扫描 worker（Phase 1.5-B）
 ├── tests/                     # pytest；核心逻辑必须可无 UI 测试
 ├── tools/                     # 开发辅助脚本（validate_schema.mjs 等）
 ├── docs/                      # 架构文档 / Phase 报告 / 第三方许可
@@ -97,7 +103,7 @@ kks-resource-manager/
 │   ├── kks_resource_manager.db
 │   ├── thumbnail_cache/
 │   └── logs/
-├── main.py                    # 入口（自检 + library 子命令；Phase 1.4 挂接 GUI）
+├── main.py                    # 入口（自检 + library / scan / resource / gui 子命令）
 ├── requirements.txt
 └── README.md
 ```
@@ -107,7 +113,7 @@ kks-resource-manager/
 
 ---
 
-## 4. 数据模型（schema v1）
+## 4. 数据模型（schema v2）
 
 ### 4.1 表清单（16 张业务表）
 
@@ -200,6 +206,9 @@ Windows 路径不区分大小写，`D:/KKS/A.png` 与 `d:\kks\a.png` 是同一�
 `author_id`、`sha256`、`quick_hash`、`content_key`、`relative_path`、
 `needs_review`（部分索引，只索引 `=1` 的行）、`resource_mods.mod_guid`。
 
+> 注：`quick_hash` / `content_key` 两列及其索引自 Phase 2.0-C §18.1 起定为
+> **deprecated / unused**（不写、不读、不删除），保留仅为兼容既有数据库。
+
 ---
 
 ## 5. 核心流程
@@ -231,9 +240,12 @@ Windows 路径不区分大小写，`D:/KKS/A.png` 与 `d:\kks\a.png` 是同一�
 **不做**「每次启动重新解析全部文件」。判定顺序：
 
 1. 比对 `(path, size, modified_time)` —— 三者一致即 skip。
-2. 需要高可靠性时（重复检测）才计算 `sha256`。
-3. **首次扫描绝不对数万文件默认计算全量 SHA256**（会极慢）；
-   需要时先算轻量指纹 `quick_hash`（大小 + 首尾块）做预筛。
+2. 需要解析时（新增文件 / `(size, mtime)` 变化 / `mode='full'`），在**同一次稳定读取窗口**内
+   计算 `resources.sha256`：窗口 = `stat_before` → parse → `sha256` → `stat_after`；
+   窗口内 `(size, mtime)` 变化则本次结果**整体不提交**（Phase 2.1 的 C7 一致性规则）。
+3. 增量命中（跳过解析）**不重算哈希**；`sha256` 是全部已解析文件的字节身份，
+   而不是「按需才计算」。旧设计中的轻量指纹 `quick_hash`（大小 + 首尾块）自
+   Phase 2.0-C 起定为 deprecated / unused，不再参与预筛。
 
 ### 5.3 搜索策略（已实测）
 
@@ -322,7 +334,9 @@ FTS 存量回填只在**真正执行了迁移**时进行（`applied` 非空）�
 具体保障：
 
 - 解析层全程只读（`open(path, "rb")`）。
-- 重复检测**只生成建议**（`duplicate_groups.status='suggested'`），永不自动删除。
+- 重复检测是**只读派生查询**（`GROUP BY sha256`，不落库、永不自动删除）；
+  预留表 `duplicate_groups` / `duplicate_members` 至今零写入，用户确认层（confirm /
+  dismiss / canonical）属后续阶段。
 - 「文件位置」与「分类」分离，打标签/加 Collection 不碰文件系统。
 - 未来（Phase 5）任何文件操作都必须：**Preview → Confirm → Undo/Backup**。
 - `core/` 层不 import 任何网络库。
@@ -361,12 +375,15 @@ FTS 存量回填只在**真正执行了迁移**时进行（`applied` 非空）�
 | Phase | 内容 | 状态 |
 | :--- | :--- | :--- |
 | **0** | 架构与项目初始化（本文档 + 骨架 + schema） | ✅ 完成 |
-| 1 | 扫描 + KKS/KK 卡片识别 + SQLite + 基础浏览器 | 🚧 进行中（1.1 ✅） |
-| 2 | MOD 索引 + GUID + 依赖关系 | — |
-| 3 | 分类 + 标签 + 作者 + Collection | — |
-| 4 | 重复检测 + 资源关系 | — |
-| 5 | 批量文件操作（Preview/Confirm/Undo） | — |
-| 6 | 性能优化 + 测试 + Windows 打包 | — |
+| 1 | 扫描 + KKS/KK 卡片识别 + SQLite + 只读 GUI 浏览器 | ✅ 完成并收尾（PHASE 1 = CLOSED） |
+| 2 | MOD / 卡片解析 + Content Identity（sha256）+ Byte-duplicate 只读派生 + 查询暴露 | ✅ 完成并收尾（tag `phase-2.4-closed`） |
+| 3 | 用户数据 / 机器事实分离 + Tag 体系（Phase 3 首期） | 🚧 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；3.3 及以后**未冻结** |
+| 4 | 重复检测 + 资源关系 | ⏳ 早期路线图占位（byte-duplicate 已在 Phase 2 完成），未重新论证 |
+| 5 | 批量文件操作（Preview/Confirm/Undo） | ⏳ 早期路线图占位，未论证 |
+| 6 | 性能优化 + 测试 + Windows 打包 | ⏳ 早期路线图占位，未论证 |
+
+> Phase 3 的子阶段编号与顺序**未被 Contract 冻结**（`PHASE3_0_CONTRACT.md` §15）；
+> 当前工作方向与权威级别见 `docs/PROJECT_STATE.md` §4。
 
 Phase 1 拆成 4 个可独立验收的小步（一次只做一步，做完即验收）：
 

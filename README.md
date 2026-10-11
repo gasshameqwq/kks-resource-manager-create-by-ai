@@ -2,9 +2,12 @@
 
 > **Koikatsu Sunshine 本地资源管理器** — 本地优先、默认只读、可人工修正。
 >
-> 当前状态：**Phase 1.5-B 已完成（GUI 扫描：增量 / 全量 + 后台 worker + 完成后统一刷新）**
-> · 下一阶段：Phase 1.5-C/D（进度 / 取消 / 文件监控，需真实证据驱动）或直接进入 Phase 2
-> · schema `v2` · Python 3.11+
+> 当前状态：**Phase 3.2（Tag System）已 CLOSED / PASS**（tag `phase-3.2-closed`，HEAD `034a726`）
+> · 已封存：Phase 1 / Phase 2（`phase-2.4-closed`）/ Phase 3.0 · 3.0.2 · 3.1 · 3.2
+> · 下一步：Phase 3.3 及以后为**待规划方向（未冻结）**
+> · schema `v2` · Python 3.11+ · 测试基线 `883 passed`
+>
+> 各阶段状态与权威文档入口以 [docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) 为准。
 
 这不是「角色卡分类器」，而是一个**本地、可搜索、可分类、可关联的 KKS 资源数据库**，
 角色卡只是其中一种资源。设计目标是从任意一端都能查询：
@@ -30,9 +33,13 @@
 
 ## 快速开始
 
-还没有 GUI：入口是命令行。数据库自检只用标准库 `sqlite3`，不需要第三方依赖。
+GUI 与命令行入口并存：`python main.py gui` 启动 PyQt6 界面（Phase 1.4 起的只读 GUI），
+其余为命令行子命令。数据库自检只用标准库 `sqlite3`，不需要第三方依赖。
 
 ```bash
+# 启动图形界面（PyQt6；界面只调用 core/，不含业务逻辑）
+python main.py gui
+
 # 初始化或升级数据库，打印结构摘要
 python main.py --init-db
 
@@ -81,6 +88,25 @@ python main.py scan 1 --full
 扫描**只读**：不移动 / 重命名 / 删除任何文件，也不写缓存；文件消失只标记
 `scan_status='missing'`，不删数据库行。
 
+### 人工修正资源字段（Phase 3.1）
+
+```bash
+# 展示名覆盖 / 清除（只写数据库，不改文件名）
+python main.py resource set-display-name 12 "白峰一乃"
+python main.py resource set-display-name 12 --clear
+
+# 用户备注
+python main.py resource set-notes 12 "来自 2024 年合集"
+python main.py resource set-notes 12 --clear
+
+# 用户类型修正（type_source 切换为 user，重扫不覆盖）
+python main.py resource set-type 12 character_card
+```
+
+以上命令经 `core.app.ResourceWriteService` 写入，遵循「用户数据 / 机器事实分离」：
+Scanner 重扫不会覆盖用户值。Tag / Favorite 的**写 API 已在 Phase 3.2 落地**
+（`core.app.TagWriteService`），但用户入口属后续阶段。
+
 Phase 1.4 起 `main.py` 会挂接 PyQt6 主窗口，核心逻辑始终留在 `core/`。
 
 ```bash
@@ -117,13 +143,13 @@ kks-resource-manager/
 │   ├── library/          # Library 管理：libraries 表 CRUD（Phase 1.1）
 │   ├── scanner/          # 目录遍历 + 增量扫描        （Phase 1）
 │   ├── parsers/          # KKS/KK 卡片解析            （Phase 1）
-│   ├── mod/              # zipmod manifest / GUID     （Phase 2）
-│   ├── thumbnails/       # 缩略图缓存                 （Phase 1）
-│   ├── duplicate/        # 重复检测                   （Phase 4）
-│   └── classification/   # 识别优先级 Level 1–4       （Phase 1 起）
-├── ui/                   # 界面层：只调用 core/，Phase 1 实现
+│   ├── mod/              # 空壳模块（MOD manifest 实际在 parsers/zipmod.py）
+│   ├── thumbnails/       # 缩略图缓存（只写 data/thumbnail_cache/）
+│   ├── duplicate/        # 空壳模块（byte-duplicate 为 Query 层只读派生）
+│   └── classification/   # 识别优先级 Level 1–4
+├── ui/                   # 界面层：只调用 core/，不含业务逻辑
 ├── tests/                # pytest：核心逻辑必须可无 UI 测试
-├── tools/                # 开发辅助脚本（validate_schema.mjs）
+├── tools/                # 开发辅助脚本（validate_schema.mjs / check_model_sync.mjs 等）
 ├── docs/                 # 架构文档 / Phase 报告 / 第三方许可
 ├── data/                 # 运行时数据（.gitignore 忽略）
 └── main.py               # 入口（自检 + library 子命令）
@@ -151,14 +177,15 @@ kks-resource-manager/
 | Phase | 内容 | 状态 |
 | :--- | :--- | :--- |
 | **0** | 架构与项目初始化（文档 + 骨架 + schema） | ✅ 已完成 |
-| 1 | 扫描 + KKS/KK 卡片识别 + SQLite + 基础浏览器 | 🚧 1.1–1.3 ✅；**1.4 只读 GUI 全部完成并收尾 ✅**；**1.5-A GUI Library 管理 ✅**；**1.5-B GUI 扫描 ✅** |
-| 2 | MOD 索引 + GUID + 依赖关系 | — |
-| 3 | 分类 + 标签 + 作者 + Collection | — |
-| 4 | 重复检测 + 资源关系 | — |
-| 5 | 批量文件操作（Preview / Confirm / Undo） | — |
-| 6 | 性能优化 + 测试 + Windows 打包 | — |
+| 1 | 扫描 + KKS/KK 卡片识别 + SQLite + 只读 GUI 浏览器 | ✅ 已完成并收尾（PHASE 1 = CLOSED） |
+| 2 | MOD / 卡片解析 + Content Identity（sha256）+ Byte-duplicate（只读派生）+ 查询暴露 | ✅ 已完成并收尾（tag `phase-2.4-closed`） |
+| 3 | 用户数据 / 机器事实分离 + Tag 体系（Phase 3 首期） | 🚧 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；3.3 及以后**待规划（未冻结）** |
+| 4 | 重复检测 + 资源关系 | ⏳ 早期路线图占位：byte-duplicate 已在 Phase 2 完成；其余未重新论证 |
+| 5 | 批量文件操作（Preview / Confirm / Undo） | ⏳ 早期路线图占位，未论证 |
+| 6 | 性能优化 + 测试 + Windows 打包 | ⏳ 早期路线图占位，未论证 |
 
 每完成一个 Phase 必须：跑测试 → 修错误 → 确认旧功能未被破坏 → 更新 README → 才进入下一阶段。
+Phase 3 的**路线图未冻结**（来源与权威级别见 [docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) §4）。
 
 ---
 
@@ -166,6 +193,7 @@ kks-resource-manager/
 
 | 文档 | 内容 |
 | :--- | :--- |
+| [docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) | **当前状态与权威文档入口**（基线 / 已完成阶段 / 未冻结路线图 / 未决证据） |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 分层、数据模型、关键设计决策、迁移约定 |
 | [docs/PHASE0_REPORT.md](./docs/PHASE0_REPORT.md) | Phase 0 验收报告（实测输出、已知缺口、Phase 1 进入条件） |
 | [docs/phase1/PHASE1_REPORT.md](./docs/phase1/PHASE1_REPORT.md) | Phase 1 报告（1.1 已完成 + 两个 P1 修复 + 后续步骤） |
@@ -191,6 +219,15 @@ kks-resource-manager/
 | [docs/phase1/PHASE1_5A_REPORT.md](./docs/phase1/PHASE1_5A_REPORT.md) | Phase 1.5-A 报告（GUI Library 管理：Add / Enable / Disable / Remove + 薄 application 层） |
 | [docs/phase1/PHASE1_5B_REPORT.md](./docs/phase1/PHASE1_5B_REPORT.md) | Phase 1.5-B 报告（GUI 扫描：ScanWorker + 后台执行 + 完成后统一刷新 + Remove 竞态防护） |
 | [docs/phase1/PHASE1_FINAL_REPORT.md](./docs/phase1/PHASE1_FINAL_REPORT.md) | Phase 1 最终 Closure 报告（审计清单 / 不变量 / P2-P3 / PHASE 1 = CLOSED） |
+| [docs/phase2/PHASE2_FINAL_CLOSURE_REPORT.md](./docs/phase2/PHASE2_FINAL_CLOSURE_REPORT.md) | Phase 2 最终 Closure 报告（Content Identity / Byte-duplicate / 查询暴露；PHASE 2 = CLOSED） |
+| [docs/phase2/PHASE2_0_C_ARCHITECTURE_DESIGN.md](./docs/phase2/PHASE2_0_C_ARCHITECTURE_DESIGN.md) | Phase 2.0-C 架构设计（身份模型 / 不变式 C1–C8 / 修订路线图） |
+| [docs/phase3/PHASE3_0_CONTRACT.md](./docs/phase3/PHASE3_0_CONTRACT.md) | Phase 3 首期 Architecture / Scope Contract（**FROZEN**，最高权威） |
+| [docs/phase3/PHASE3_0_DECISION_REPORT.md](./docs/phase3/PHASE3_0_DECISION_REPORT.md) | Phase 3.0 决策报告（D1–D5；`display_name` 现行语义见 Contract §3.1） |
+| [docs/phase3/PHASE3_0_2_SEARCH_TAXONOMY_ARCHITECTURE_REVIEW.md](./docs/phase3/PHASE3_0_2_SEARCH_TAXONOMY_ARCHITECTURE_REVIEW.md) | Phase 3.0.2 搜索与分类设计评审（未冻结工作路线来源） |
+| [docs/phase3/PHASE3_1_CLOSURE_REPORT.md](./docs/phase3/PHASE3_1_CLOSURE_REPORT.md) | Phase 3.1 Closure（User Write Foundation = CLOSED / PASS） |
+| [docs/phase3/PHASE3_2_CLOSURE_REPORT.md](./docs/phase3/PHASE3_2_CLOSURE_REPORT.md) | Phase 3.2 Closure（Tag System = CLOSED / PASS） |
+| [docs/phase3/PHASE3_2_LOG.md](./docs/phase3/PHASE3_2_LOG.md) | Phase 3.2 实施日志（含最终状态索引） |
+| [docs/phase3/PHASE3_0_OPEN_EVIDENCE.md](./docs/phase3/PHASE3_0_OPEN_EVIDENCE.md) | U1–U5 证据缺口登记（**未解决**，本轮不执行取证） |
 | [docs/THIRD_PARTY.md](./docs/THIRD_PARTY.md) | 第三方来源与 License 合规 |
 
 ---

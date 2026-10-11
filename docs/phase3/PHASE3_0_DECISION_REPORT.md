@@ -14,6 +14,30 @@
 
 ---
 
+### 后续权威指针（2026-10-10 追加 · 不改写原报告）
+
+本报告为 **Phase 3.0 的决策记录**，其正文按治理边界**保持原样、未改写**。
+但 §3.1 中关于 `display_name` 的表述（列为「共享字段」，规则为「值 ≠ 旧 `name` 时保留」）
+**已被后续冻结契约取代**：
+
+> **现行权威 = `docs/phase3/PHASE3_0_CONTRACT.md` §3.1（r1「解法 B」）**
+> `display_name` 是**纯用户数据**；`NULL` = 用户未覆盖；
+> `effective_display_name = display_name or name`；Scanner / Parser **不得写入** `display_name`；
+> 「值恰好等于 `name`」**仍**视为有效 override（禁止用相等性判断 override 是否存在）。
+
+依据：Contract §2.2 的「契约修正声明」与 §16.5（记为经用户确认的授权修正），
+附录 A 亦明确本报告 §3.1 相应细节「视为被本 Contract 取代」；
+实施证据与此一致（`core/scanner/store.py` 不写该列、`core/app/resource_write.py` 为唯一写入口、
+`core/query/dto.py` 按 NULL 语义实现）。
+
+> 证据局限（如实说明）：「经用户确认」这一批准记录**目前仅存在于 Contract 自身文字
+> （§2.2 / §16.5 / 附录 A）**，仓库内**没有**独立的批准文件。
+> 本次治理**不补造**任何批准记录；如需补齐，应由用户提供或另立记录。
+
+现行权威登记见 `docs/PROJECT_STATE.md` §5。
+
+---
+
 ## 0. 基线核对（本阶段实测）
 
 ```text
