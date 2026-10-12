@@ -193,7 +193,8 @@ Phase 3 的**路线图未冻结**（来源与权威级别见 [docs/PROJECT_STATE
 
 | 文档 | 内容 |
 | :--- | :--- |
-| [docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) | **当前状态与权威文档入口**（基线 / 已完成阶段 / 未冻结路线图 / 未决证据） |
+| [docs/WORKFLOW.md](./docs/WORKFLOW.md) | 长期协作规范（角色职责 / 标准流程与任务指令 / 暂停条件 / 文档职责摘要与分层 / 审核结论与阶段状态 / Git 授权与收尾） |
+| [docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) | **当前状态、文档职责登记与权威文档入口**（基线 / 已完成阶段 / 未冻结路线图 / 未决证据） |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 分层、数据模型、关键设计决策、迁移约定 |
 | [docs/PHASE0_REPORT.md](./docs/PHASE0_REPORT.md) | Phase 0 验收报告（实测输出、已知缺口、Phase 1 进入条件） |
 | [docs/phase1/PHASE1_REPORT.md](./docs/phase1/PHASE1_REPORT.md) | Phase 1 报告（1.1 已完成 + 两个 P1 修复 + 后续步骤） |

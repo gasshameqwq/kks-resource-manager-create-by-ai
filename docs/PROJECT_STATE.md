@@ -1,7 +1,7 @@
 # PROJECT_STATE — 项目当前状态与权威文档入口
 
 > 文档类型：**当前状态登记（CURRENT STATE）**。不是冻结契约，不是阶段报告。
-> 最后更新：2026-10-11（§1 测试基线时间来源、§2.2 权威分工修正）
+> 最后更新：2026-10-12（§1 HEAD 语义与核验时点说明；§2.1 职责登记现状说明）
 >
 > 维护规则：
 > - 本文件只描述**当前**状态；历史结论仍以对应阶段报告为准，**不以本文件改写历史**。
@@ -10,12 +10,17 @@
 
 ---
 
-## 1. 基线快照（2026-10-10 实测）
+## 1. 基线快照
+
+**时点与语义说明**：本表记录的是**上一次核验时点**的基线，**不会随每次提交自动更新**。
+其中「HEAD（本次核验的仓库起点）」记录的是**本次文档修订提交之前**核验到的 HEAD ——
+提交本次修订后，它**预期不再等于当前 HEAD**，这属正常情况，不代表本文件失效、也不需要立即改写。
+需要"当前 HEAD"时应现场执行 `git rev-parse HEAD`，不要直接引用本表。
 
 | 项 | 值 | 证据 |
 | :--- | :--- | :--- |
-| HEAD | `034a726`（docs: close phase 3.2） | `git log -1` |
-| 最新 tag | `phase-3.2-closed` → `034a726` | `git rev-list -n1` |
+| HEAD（本次核验的仓库起点；**本次文档修订提交之前**） | `9951045`（docs: reconcile project state and architecture） | `git rev-parse HEAD`（2026-10-12 核验） |
+| 阶段关闭 tag（独立记录，与上行 HEAD 无对应关系） | `phase-3.2-closed` → `034a726`（Phase 3.2 关闭提交） | `git rev-list -n1` |
 | 历史 tag | `phase-2.0-closed` … `phase-2.4-closed`（`phase-2.4-closed` → `202c285`）· `phase-3.0-closed` → `c2fd527` · `phase-3.1-closed` → `99aa0d1` | `git tag -l` |
 | schema | `SCHEMA_VERSION == 2` · 16 张业务表 · `MIGRATIONS == {1, 2}` | `core/database/schema.py` |
 | 测试基线 | `pytest -q` → **883 passed / 0 failed / 0 skipped**（两次独立运行：治理前只读基线复跑 52.2 s，2026-10-10；文档改动后复核 44.55 s，2026-10-10。两者不是同一次测试，且都不是 2026-10-11 的测量） | 分两次实测 |
@@ -30,13 +35,25 @@
 
 | 文档 | 职责 |
 | :--- | :--- |
-| `docs/PROJECT_STATE.md`（本文件） | 当前状态、已完成阶段、当前基线、下一步方向、权威文档入口 |
+| `docs/WORKFLOW.md` | 长期协作规则：角色职责、标准流程与任务指令要求、暂停条件、文档分层与权限边界、审核与阶段状态、Git 授权规则 |
+| `docs/PROJECT_STATE.md`（本文件） | 当前状态、已完成阶段、当前基线、下一步方向、**文档职责登记**、权威文档入口 |
 | 阶段 Contract | 冻结的目标、范围、架构约束、验收标准 |
 | Decision Report | 重要设计决策、备选方案、理由、状态及相关契约 |
+| 大阶段总工作文档 | 大阶段的总体目标、简要计划、进度、成果摘要、遗留问题与索引（不承担小阶段详细实施说明） |
+| 小阶段工作文档 | 具体小阶段的目标与范围、实施边界、测试与验收标准、实际结果 |
 | Implementation Log | 同一阶段内按子阶段记录实施过程、测试结果、问题与处理结论（原则上持续更新同一份） |
 | Closure Report | 最终验收结论、测试证据、Git commit / tag |
 | `README.md` | 项目简介、当前状态、高层路线图 |
 | `docs/ARCHITECTURE.md` | 当前有效的架构（不得把已废弃设计描述成当前实现） |
+| 项目对话使用说明（非仓库文档） | ChatGPT 会话内的协作约定与沟通要求；**不取代**上述仓库文档 |
+
+**本表是文档职责的唯一登记入口**；`docs/WORKFLOW.md` 只保留协作所需的职责摘要与指向。
+
+**现状说明（避免误读为"文件已存在"）**：本表登记的是**职责 / 文档类型**，不是"仓库现有文件清单"。
+
+- 「大阶段总工作文档」「小阶段工作文档」为**文档类型定义**，目前**尚未创建**对应文件；是否创建属当前项目决策，不在本表决定（`docs/WORKFLOW.md` §5.1 只规定分层原则）。
+- 「项目对话使用说明」**不是仓库文件**，仅用于说明 ChatGPT 会话内的协作约定，不取代仓库文档。
+- 上表其余各项在仓库中均有对应产出：`docs/WORKFLOW.md`（文件已创建，**截至本次修订尚未纳入版本控制**）、`docs/PROJECT_STATE.md`、各阶段 Contract、Decision Report、Implementation Log、Closure Report、`README.md`、`docs/ARCHITECTURE.md`。
 
 以上为职责定义，不代表每个阶段必须产出全部类型。
 
@@ -164,6 +181,7 @@ U1 / U3 / U4 / U5 **均无真实使用证据**；U2 仅有实现进度（Phase 3
 
 ## 9. 相关入口
 
+- 长期协作规范：[WORKFLOW.md](./WORKFLOW.md)
 - 架构：[ARCHITECTURE.md](./ARCHITECTURE.md)
 - Phase 3 首期冻结 Contract：[phase3/PHASE3_0_CONTRACT.md](./phase3/PHASE3_0_CONTRACT.md)
 - Phase 3.2 实施日志（含最终状态索引）：[phase3/PHASE3_2_LOG.md](./phase3/PHASE3_2_LOG.md)
