@@ -53,7 +53,7 @@
 
 - 「大阶段总工作文档」「小阶段工作文档」为**文档类型定义**，目前**尚未创建**对应文件；是否创建属当前项目决策，不在本表决定（`docs/WORKFLOW.md` §5.1 只规定分层原则）。
 - 「项目对话使用说明」**不是仓库文件**，仅用于说明 ChatGPT 会话内的协作约定，不取代仓库文档。
-- 上表其余各项在仓库中均有对应产出：`docs/WORKFLOW.md`（文件已创建，**截至本次修订尚未纳入版本控制**）、`docs/PROJECT_STATE.md`、各阶段 Contract、Decision Report、Implementation Log、Closure Report、`README.md`、`docs/ARCHITECTURE.md`。
+- 上表其余各项在仓库中均有对应产出：`docs/WORKFLOW.md`（已于提交 `41e0939` 纳入版本控制）、`docs/PROJECT_STATE.md`、各阶段 Contract、Decision Report、Implementation Log、Closure Report、`README.md`、`docs/ARCHITECTURE.md`。
 
 以上为职责定义，不代表每个阶段必须产出全部类型。
 
