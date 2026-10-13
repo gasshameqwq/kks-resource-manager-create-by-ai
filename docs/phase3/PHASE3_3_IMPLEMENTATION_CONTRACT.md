@@ -1,17 +1,20 @@
 # Phase 3.3 — Implementation Contract（Search & Query Foundation）
 
-> 文档类型：**实施前 Implementation Contract 草案 —— DRAFT / CANDIDATE（尚未冻结）**
+> 文档类型：**Phase 3.3 Implementation Contract —— FROZEN（已冻结；用户确认见 §19）**
 > 日期：2026-10-12
 > 权威层级（从高到低）：
 > 1. `docs/phase3/PHASE3_0_CONTRACT.md`（Phase 3 首期 Architecture / Scope Contract，最高权威）
 > 2. `docs/phase3/PHASE3_0_2_SEARCH_TAXONOMY_ARCHITECTURE_REVIEW.md`（Search & Taxonomy 设计评审）
 > 3. `docs/phase3/PHASE3_2_IMPLEMENTATION_CONTRACT.md`（Tag System，FROZEN / PASS）
-> 4. 本文件 —— Phase 3.3 实施契约草案，**不得与上级冲突**
+> 4. 本文件 —— Phase 3.3 Implementation Contract（**FROZEN**，2026-10-13），**不得与上级冲突**
 >
 > 前置：Phase 3.2 = CLOSED / PASS（tag `phase-3.2-closed` → `034a726`；实现 commit `841865d`）
 >
-> 本文件：**只做契约规划**。未修改任何功能代码 / schema / migration / 测试 / CLI / GUI；
-> 未冻结本契约；未创建 commit / tag。
+> 起草轮次（r0–r3）：**只做契约规划**。未修改任何功能代码 / schema / migration / 测试 / CLI / GUI；
+> 当时未冻结本契约、未创建 commit / tag。
+>
+> 冻结：**已由用户确认（2026-10-13）**；冻结内容由 commit `a73438e`（r3，897 行）固定，
+> Freeze Record 见 §19。**冻结 ≠ 实施授权**：Phase 3.3 功能实施需另行授权。
 
 > **修订记录**
 > - r0（2026-10-12）：初稿（DRAFT / CANDIDATE），§3 的入口问题标记为待用户裁决。
@@ -45,19 +48,27 @@
 >   的测量层（Query 层连接级 `total_changes`；CLI 层文件 SHA-256）；
 >   **N7** §13-4 明确覆盖 T-A 至 T-S 全部不变式；**N8** §4.6 说明参数列举顺序不代表签名顺序
 >   （全部 keyword-only）。**N6（Git 跟踪）不在文本修订范围。仍未冻结、未实施。**
+> - r4（2026-10-13，**冻结记录补齐**；**仅状态元数据，未改动任何实质性契约条款**）：
+>   头部状态标记改为 **FROZEN**；§19 Freeze Record 补齐（用户确认日期、冻结内容 commit
+>   `a73438e`、自引用说明）；术语约定更新为"候选条款自冻结记录完成起成为冻结条款"；
+>   附录 B 同步标注（起草/修订轮次的范围限定与"冻结由后续轮次完成"）。
+>   历史条目（r0–r3）中的"未冻结 / DRAFT / CANDIDATE"为**当时状态**，不代表现行状态。
 
-> **状态声明**：本文件为**草案 / CANDIDATE**，**尚未冻结、尚未进入实施**。
-> §3 的入口裁决已由用户裁定为 **Option B**（r1），该处不再存在待决项；
-> 但契约整体仍需用户确认后方可冻结（见 §19）。冻结前，本文件不构成实施授权。
+> **状态声明**：本文件已 **FROZEN** —— 用户于 2026-10-13 确认冻结，
+> 冻结内容为 r3（commit `a73438e`，见 §19）。§3 的入口裁决为 **Option B**（r1，2026-10-12），
+> 该处不存在待决项。
+> **冻结不构成实施授权**：Phase 3.3 功能实施仍需单独授权；本文档亦不代表任何实施验收结果。
 
-> **术语约定（r1）**：本文件尚未冻结，因此正文中标注「**候选**」的条款
-> （§4–§9、§12、§16 及各处「候选定义」）目前均属**候选定义**；
-> 只有在 §19 Freeze Record 被补齐后，它们才成为**冻结条款**。
-> 正文中的「必须 / 不得」描述的是**冻结后**对实施的约束力，**不构成当前实施授权**。
+> **术语约定（r3 冻结后更新）**：§19 Freeze Record 已补齐，因此正文中标注「**候选**」的条款
+> （§4–§9、§12、§16 及各处「候选定义」）**自冻结记录完成之时起成为【FROZEN】冻结条款**；
+> 未标注「候选」的章节（如 §11 步骤、§13 DoD、§14 变更控制、§15 边界）同样随本次冻结生效。
+> 其「必须 / 不得」的约束力自此生效，但**不构成实施授权**（实施需另行授权）。
+> 正文中的「候选」一词自此为**历史标注**（表示该类条款在冻结前曾是候选），不再表示"尚未冻结"。
 
-> **冻结声明**：本契约一旦冻结，将冻结 Phase 3.3 的范围、Query Model 定义、
-> 筛选语义、兼容性约束与测试不变式。任何扩大 3.3 范围的行为，
-> 必须先走 `PHASE3_0_CONTRACT.md` §16 变更控制（新增评审 + 更新 Contract + 用户确认）。
+> **冻结声明**：本契约**已冻结**（2026-10-13，证据见 §19）。冻结范围为 Phase 3.3 的
+> 范围、Query Model 定义、筛选语义、兼容性约束与测试不变式。
+> 任何扩大 3.3 范围的行为，必须先走 `PHASE3_0_CONTRACT.md` §16 变更控制
+> （新增评审 + 更新 Contract + 用户确认）。
 
 ---
 
@@ -858,14 +869,25 @@ is_system · resource_count · library_id · favorite 列 · favorites 表 · �
 ## 19. Freeze Record
 
 ```text
-Design Review（本草案）      → 完成（DRAFT / CANDIDATE，r3）
+Design Review（本草案）      → 完成（r0–r3：DRAFT / CANDIDATE）
 §3 入口裁决                  → 【已批准：Option B】（2026-10-12）
-Implementation Contract      → 未冻结（待用户确认后冻结）
-Phase 3.3 implementation     → 未开始
+用户冻结确认                 → 【已确认】（2026-10-13）
+契约内容冻结（Git 证据）      → commit a73438eabe8c716ff9b6b5242c90e7b17286e88c
+                              "docs(phase3.3): freeze implementation contract"
+                              提交时间 2026-10-13T18:11:16+08:00 · 单文件 · 897 行
+                              · SHA-256 8670EDE04950DEEC69AF247F193AA906F010ED187ECA35EF2C165D5138DDDB36
+Freeze Record 补齐           → 完成（本记录，r4）
+Implementation Contract      → FROZEN
+Phase 3.3 implementation     → 未开始（需另行授权）
 Phase 3.3 CLOSED             → 未达成
 ```
 
-冻结时点：**待定**（原因为空）。
+冻结时点：**2026-10-13**（用户确认于该日；Git 证据为上述 commit，其提交时间为
+2026-10-13T18:11:16+08:00）。
+
+**自引用说明**：本 Freeze Record 的补齐随**其自身提交**一起入库，因此**不内嵌该提交自身的
+hash**（写入 hash 会改变内容、进而改变 hash，无法自洽）；此处改为记录 r3 冻结内容的 commit
+`a73438e`。若需登记本记录提交的 hash，应由 `PROJECT_STATE.md` 或后续 Closure Report 承担。
 
 ---
 
@@ -883,7 +905,7 @@ Phase 3.3 CLOSED             → 未达成
 | Phase 3.2 §4.5 / §7.4 / §10（Favorite 唯一事实、TagQuery 边界） | §5 / §6 | ✅ 一致 |
 | Phase 3.2 §1.1（Tag scope = GLOBAL） | §6 | ✅ 沿用 |
 
-## 附录 B — 本轮只读合规核对
+## 附录 B — 起草/修订轮次（r0–r3）只读合规核对
 
 | 禁止项 | 状态 |
 | :--- | :--- |
@@ -891,7 +913,7 @@ Phase 3.3 CLOSED             → 未达成
 | 修改测试 / UI / CLI / `main.py` | ✅ 未做 |
 | 修改数据库（含写操作） | ✅ 未做（仅只读打开） |
 | 实现 Query Model / 筛选 / Search | ✅ 未做 |
-| 冻结 Contract | ✅ 未做（草案） |
-| 创建 commit / tag / push | ✅ 未做 |
+| 冻结 Contract | ✅ 起草 / 修订轮次内未冻结；用户在后续轮次确认冻结（见 §19，2026-10-13） |
+| 创建 commit / tag / push | ✅ 起草 / 修订轮次内未做；冻结提交 `a73438e` 属后续授权轮次（**tag / push 仍未做**） |
 | 更新 `PROJECT_STATE.md` | ✅ 未做（按 `WORKFLOW.md` §5.1，状态同步在冻结 / 关闭后） |
-| 唯一被修改文件 | 本文件 `docs/phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md`（当前 **r3** 修订；无其它文件变更） |
+| 唯一被修改文件 | 本文件 `docs/phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md`（r3 内容 + r4 冻结记录补齐均只改本文件；无其它文件变更） |
