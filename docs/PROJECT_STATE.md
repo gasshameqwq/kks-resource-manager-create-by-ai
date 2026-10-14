@@ -1,7 +1,8 @@
 # PROJECT_STATE — 项目当前状态与权威文档入口
 
 > 文档类型：**当前状态登记（CURRENT STATE）**。不是冻结契约，不是阶段报告。
-> 最后更新：2026-10-12（§1 HEAD 语义与核验时点说明；§2.1 职责登记现状说明）
+> 最后更新：2026-10-14（§4 同步 Phase 3.3 契约已冻结的事实与 Git 证据；§6 登记
+> README / ARCHITECTURE 路线图陈述漂移；§7 U2 排期裁决说明；§9 新增 Phase 3.3 Contract 入口）
 >
 > 维护规则：
 > - 本文件只描述**当前**状态；历史结论仍以对应阶段报告为准，**不以本文件改写历史**。
@@ -112,7 +113,7 @@ Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplic
 | 3.0.2 | Search & Taxonomy Design Review | ✅ 已完成（设计评审已入库） |
 | 3.1 | User Write Foundation | ✅ 已完成（CLOSED / PASS） |
 | 3.2 | Tag System | ✅ 已完成（CLOSED / PASS） |
-| 3.3 | Search & Query Foundation | ⏳ **待规划方向**（未开始、未冻结） |
+| 3.3 | Search & Query Foundation | 🔒 **契约已冻结（FROZEN，2026-10-13）**；**实施未开始**（待单独授权）；**阶段未关闭** |
 | 3.4 | User Classification & Search | ⏳ **待规划方向**（未开始、未冻结） |
 | 3.5 | CLI / GUI Integration | ⏳ **待规划方向**（未开始、未冻结） |
 | 3.6 | （无定义） | ⚠️ **定义缺失**：仅出现在路线图记录中，全仓无任何内容定义；**不视为已批准阶段**，本文件不代为定义，也不删除该条目 |
@@ -120,10 +121,21 @@ Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplic
 **来源与权威级别**：3.0.2 / 3.1 / 3.2–3.5 顺序来自
 `docs/phase3/PHASE3_0_2_SEARCH_TAXONOMY_ARCHITECTURE_REVIEW.md` §11 与该文件头部记录的
 「P3.0.1 路线图」，并由 `docs/phase3/PHASE3_2_LOG.md` §1 沿用。
-该来源属**审查级记录**（非 Contract、非冻结）；3.1 / 3.2 已是**事实**，3.3 及以后仅为方向。
+该来源属**审查级记录**（非 Contract、非冻结）；3.1 / 3.2 已是**事实**，3.3 已有**冻结契约**
+（其能力范围来自 `PHASE3_0_CONTRACT.md` §12-6 与用户批准的 Option B；见下方冻结记录），
+3.4 及以后仅为方向。
+
+**Phase 3.3 冻结记录（事实）**：权威契约为
+[phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md)，
+状态 **FROZEN**（用户冻结确认 2026-10-13）。Git 证据：冻结内容提交 `a73438e`
+（`docs(phase3.3): freeze implementation contract`，单文件、897 行）·
+Freeze Record 补齐提交 `fe0cbcb`（`docs(phase3.3): record contract freeze`）。
+该契约**只冻结 Phase 3.3 自身**的范围、Query Model 定义、筛选语义、兼容性约束与测试不变式，
+**不冻结**本节路线图；3.3 的**功能实施尚未开始、尚未获得授权**，阶段**未关闭**（无 Closure、无 tag）。
 
 **边界**：登记本路线图**不扩大** Phase 3 首期 Contract 的能力范围；
-任何 3.3 及以后的范围决策都必须另行评审（Contract §16 变更控制）。
+任何 3.3 及以后的范围决策都必须另行评审（Contract §16 变更控制）——
+3.3 已按此流程评审并由用户确认冻结（见上方冻结记录）。
 
 **Phase 4 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 4–6 条目来自早期路线图，
 尚未重新论证（Phase 4 的 byte-duplicate 部分已在 Phase 2 以只读派生形式完成）。
@@ -152,6 +164,7 @@ Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplic
 | 3 | `docs/phase3/PHASE3_2_LOG.md` 顶部状态与后文（§17 / §18）及 Closure Report 互相取代但缺终态说明 | 已于 2026-10-10 在顶部追加「最终状态索引」，历史章节未删改 |
 | 4 | `PHASE3_0_DECISION_REPORT.md` 与 Contract 的 `display_name` 描述不一致 | 已于 2026-10-10 在顶部追加权威指针；原文未改写 |
 | 5 | Phase 1 / Phase 2 历史报告中的早期路线图表述（如「重复检测属 Phase 4」） | **不处理**（历史报告不改写；现行描述已在本文件与 ARCHITECTURE 修正） |
+| 6 | `README.md` 状态行「下一步：Phase 3.3 及以后为**待规划方向（未冻结）**」与其路线图行、`docs/ARCHITECTURE.md` §10 路线图行的「3.3 及以后**未冻结**」—— 与 Phase 3.3 契约已于 2026-10-13 冻结（见 §4）不符 | **本轮只登记，不处理**：这两个文件不在本任务允许修改范围（仅 `docs/PROJECT_STATE.md`）；如需同步，应由后续获授权的文档修订处理 |
 
 ---
 
@@ -163,7 +176,9 @@ Phase 3.0 Contract §14.3 的 U1–U5 属 `[OPEN-EVIDENCE]`；本轮**只登记�
 
 截至本文件更新时（持久工作库 `resources=0`、`tags=0`、`resource_tags=0`），
 U1 / U3 / U4 / U5 **均无真实使用证据**；U2 仅有实现进度（Phase 3.1 已落 CLI 写入口），
-**不构成证据**。
+**不构成证据**。补充（2026-10-14）：U2 的**排期**已由用户以 Option B 裁决
+（core→CLI 先行，见 §4 Phase 3.3 冻结记录），但该裁决**不构成证据**，
+**真实入口偏好**仍无数据，U2 **不因此关闭**。
 
 ---
 
@@ -184,6 +199,7 @@ U1 / U3 / U4 / U5 **均无真实使用证据**；U2 仅有实现进度（Phase 3
 - 长期协作规范：[WORKFLOW.md](./WORKFLOW.md)
 - 架构：[ARCHITECTURE.md](./ARCHITECTURE.md)
 - Phase 3 首期冻结 Contract：[phase3/PHASE3_0_CONTRACT.md](./phase3/PHASE3_0_CONTRACT.md)
+- Phase 3.3 冻结 Contract（FROZEN，2026-10-13）：[phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md)
 - Phase 3.2 实施日志（含最终状态索引）：[phase3/PHASE3_2_LOG.md](./phase3/PHASE3_2_LOG.md)
 - 证据缺口登记：[phase3/PHASE3_0_OPEN_EVIDENCE.md](./phase3/PHASE3_0_OPEN_EVIDENCE.md)
 - 项目简介：[../README.md](../README.md)
