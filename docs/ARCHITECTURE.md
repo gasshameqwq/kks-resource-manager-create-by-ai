@@ -1,6 +1,6 @@
 # KKS Resource Manager — 架构文档
 
-> 版本：Phase 3.2 基线（Tag System 已 CLOSED / PASS） · schema v2 · 2026-10-10
+> 版本：Phase 3.3 基线（Search & Query Foundation 已 CLOSED / CONDITIONAL PASS） · schema v2 · 2026-10-15
 > 本文件只描述**当前有效**的架构；各阶段状态与权威文档入口见 `docs/PROJECT_STATE.md`。
 
 本文档描述系统的分层、数据模型与关键技术决策。Phase 0 交付了本文档、
@@ -377,14 +377,16 @@ FTS 存量回填只在**真正执行了迁移**时进行（`applied` 非空）�
 | **0** | 架构与项目初始化（本文档 + 骨架 + schema） | ✅ 完成 |
 | 1 | 扫描 + KKS/KK 卡片识别 + SQLite + 只读 GUI 浏览器 | ✅ 完成并收尾（PHASE 1 = CLOSED） |
 | 2 | MOD / 卡片解析 + Content Identity（sha256）+ Byte-duplicate 只读派生 + 查询暴露 | ✅ 完成并收尾（tag `phase-2.4-closed`） |
-| 3 | 用户数据 / 机器事实分离 + Tag 体系（Phase 3 首期） | 🚧 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；3.3 契约已**冻结（FROZEN，2026-10-13）**、实施未开始（待单独授权）、未关闭；3.4 及以后**未冻结** |
+| 3 | 用户数据 / 机器事实分离 + Tag 体系（Phase 3 首期） | 🚧 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；**3.3 已完成（CLOSED / CONDITIONAL PASS，tag `phase-3.3-closed`）**；3.4 及以后**未冻结** |
 | 4 | 重复检测 + 资源关系 | ⏳ 早期路线图占位（byte-duplicate 已在 Phase 2 完成），未重新论证 |
 | 5 | 批量文件操作（Preview/Confirm/Undo） | ⏳ 早期路线图占位，未论证 |
 | 6 | 性能优化 + 测试 + Windows 打包 | ⏳ 早期路线图占位，未论证 |
 
 > Phase 3 的子阶段编号与顺序**未被总 Contract 冻结**（`PHASE3_0_CONTRACT.md` §15）——
-> 这**不**表示没有已冻结契约：**Phase 3.3 自身已有冻结 Contract**（FROZEN，2026-10-13；
-> 功能实施未开始、阶段未关闭）。当前工作方向与权威级别见 `docs/PROJECT_STATE.md` §4。
+> 这**不**表示没有已冻结契约：**Phase 3.3 自身已有冻结 Contract**（FROZEN，2026-10-13），
+> 该契约已按其 §10.1 完成实施并由用户接受验收（**CONDITIONAL PASS**）；
+> 关闭记录见 `docs/phase3/PHASE3_3_CLOSURE_REPORT.md`。
+> 当前工作方向与权威级别见 `docs/PROJECT_STATE.md` §4。
 
 Phase 1 拆成 4 个可独立验收的小步（一次只做一步，做完即验收）：
 

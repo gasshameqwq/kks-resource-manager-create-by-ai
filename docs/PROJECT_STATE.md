@@ -1,8 +1,9 @@
 # PROJECT_STATE — 项目当前状态与权威文档入口
 
 > 文档类型：**当前状态登记（CURRENT STATE）**。不是冻结契约，不是阶段报告。
-> 最后更新：2026-10-14（§4 同步 Phase 3.3 契约已冻结的事实与 Git 证据；§6 登记
-> README / ARCHITECTURE 路线图陈述漂移；§7 U2 排期裁决说明；§9 新增 Phase 3.3 Contract 入口）
+> 最后更新：2026-10-15（§1 更新基线快照与关闭 tag；§3 新增 Phase 3.3 关闭行；§4 同步
+> Phase 3.3 实施完成 / 有条件验收 / 收尾事实与 Git 证据；§6 更新第 6 行处置状态；
+> §7 转记关闭时仍开放的事项；§9 新增 Phase 3.3 Closure Report 入口）
 >
 > 维护规则：
 > - 本文件只描述**当前**状态；历史结论仍以对应阶段报告为准，**不以本文件改写历史**。
@@ -20,11 +21,12 @@
 
 | 项 | 值 | 证据 |
 | :--- | :--- | :--- |
-| HEAD（本次核验的仓库起点；**本次文档修订提交之前**） | `9951045`（docs: reconcile project state and architecture） | `git rev-parse HEAD`（2026-10-12 核验） |
-| 阶段关闭 tag（独立记录，与上行 HEAD 无对应关系） | `phase-3.2-closed` → `034a726`（Phase 3.2 关闭提交） | `git rev-list -n1` |
-| 历史 tag | `phase-2.0-closed` … `phase-2.4-closed`（`phase-2.4-closed` → `202c285`）· `phase-3.0-closed` → `c2fd527` · `phase-3.1-closed` → `99aa0d1` | `git tag -l` |
+| HEAD（本次核验的仓库起点；**本次文档修订提交之前**） | `950645c`（feat(phase3.3): add query model and read-only tag filtering，Phase 3.3 实施提交） | `git rev-parse HEAD`（2026-10-15 核验） |
+| 阶段关闭 tag（独立记录，与上行 HEAD 无对应关系） | `phase-3.3-closed` → 收尾提交（**即本文件所在提交**；收尾提交 hash 见 `git rev-parse phase-3.3-closed^{commit}`，不在本表内嵌以避免自引用） | `git rev-parse phase-3.3-closed^{commit}` |
+| 历史 tag | `phase-2.0-closed` … `phase-2.4-closed`（`phase-2.4-closed` → `202c285`）· `phase-3.0-closed` → `c2fd527` · `phase-3.1-closed` → `99aa0d1` · `phase-3.2-closed` → `034a726` | `git tag -l` |
 | schema | `SCHEMA_VERSION == 2` · 16 张业务表 · `MIGRATIONS == {1, 2}` | `core/database/schema.py` |
 | 测试基线 | `pytest -q` → **883 passed / 0 failed / 0 skipped**（两次独立运行：治理前只读基线复跑 52.2 s，2026-10-10；文档改动后复核 44.55 s，2026-10-10。两者不是同一次测试，且都不是 2026-10-11 的测量） | 分两次实测 |
+| 测试基线（Phase 3.3） | `pytest -q` → **938 passed / 0 failed / 0 skipped**（两次独立运行：`46.84 s` 与 `44.30 s`，**均为 2026-10-15 实施轮实测**）。**该结果未经后续收尾轮重新执行**，来源为实施日志 | `docs/phase3/PHASE3_3_LOG.md` §5.2 |
 | 持久工作库 | `data/kks_resource_manager.db`：`libraries=0` / `resources=0` / `mods=0` / `tags=0` / `resource_tags=0` / `collections=0` / `duplicate_groups=0`；`schema_version='2'` | 只读打开实测 |
 | 运行环境 | Python 3.11+（实测 3.12.10）· PyQt6 / msgpack / Pillow | `requirements.txt` |
 
@@ -95,6 +97,7 @@
 | Phase 3.0.2 | 设计评审已入库（非实现、无独立 tag） | [phase3/PHASE3_0_2_SEARCH_TAXONOMY_ARCHITECTURE_REVIEW.md](./phase3/PHASE3_0_2_SEARCH_TAXONOMY_ARCHITECTURE_REVIEW.md) | — |
 | Phase 3.1 | CLOSED / PASS（User Write Foundation） | [phase3/PHASE3_1_CLOSURE_REPORT.md](./phase3/PHASE3_1_CLOSURE_REPORT.md) | `phase-3.1-closed` |
 | Phase 3.2 | CLOSED / PASS（Tag System） | [phase3/PHASE3_2_CLOSURE_REPORT.md](./phase3/PHASE3_2_CLOSURE_REPORT.md) | `phase-3.2-closed` |
+| Phase 3.3 | **CLOSED / CONDITIONAL PASS**（Search & Query Foundation） | [phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md) | `phase-3.3-closed` |
 
 Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplicate / 2.3 查询暴露 /
 2.4 收尾审计）见 `docs/phase2/` 下的各阶段报告；Phase 1 内部划分见 `docs/phase1/`。
@@ -113,7 +116,7 @@ Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplic
 | 3.0.2 | Search & Taxonomy Design Review | ✅ 已完成（设计评审已入库） |
 | 3.1 | User Write Foundation | ✅ 已完成（CLOSED / PASS） |
 | 3.2 | Tag System | ✅ 已完成（CLOSED / PASS） |
-| 3.3 | Search & Query Foundation | 🔒 **契约已冻结（FROZEN，2026-10-13）**；**实施未开始**（待单独授权）；**阶段未关闭** |
+| 3.3 | Search & Query Foundation | ✅ 已完成（**CLOSED / CONDITIONAL PASS**，2026-10-15；tag `phase-3.3-closed`；Closure Report：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)） |
 | 3.4 | User Classification & Search | ⏳ **待规划方向**（未开始、未冻结） |
 | 3.5 | CLI / GUI Integration | ⏳ **待规划方向**（未开始、未冻结） |
 | 3.6 | （无定义） | ⚠️ **定义缺失**：仅出现在路线图记录中，全仓无任何内容定义；**不视为已批准阶段**，本文件不代为定义，也不删除该条目 |
@@ -136,6 +139,16 @@ Freeze Record 补齐提交 `fe0cbcb`（`docs(phase3.3): record contract freeze`�
 **边界**：登记本路线图**不扩大** Phase 3 首期 Contract 的能力范围；
 任何 3.3 及以后的范围决策都必须另行评审（Contract §16 变更控制）——
 3.3 已按此流程评审并由用户确认冻结（见上方冻结记录）。
+
+**Phase 3.3 实施与关闭记录（事实，2026-10-15）**：实施（严格落在契约 §10.1 允许范围内）已完成，
+实施提交为 `950645c`（`feat(phase3.3): add query model and read-only tag filtering`，
+9 files changed / 1506 insertions(+) / 19 deletions(-)）；用户已接受验收结论
+**`CONDITIONAL PASS`**（**非**无条件 PASS，条件/非阻断事项见下与 §7）。
+收尾提交（`docs(phase3.3): close phase 3.3`）包含 Phase 3.3 Closure Report 与本次状态同步，
+annotated tag `phase-3.3-closed` 指向该收尾提交；完成时核验 `HEAD == phase-3.3-closed^{commit}`、
+工作树 clean。收尾提交自身的 hash **不在本文件内嵌**（自引用），
+以 `git rev-parse phase-3.3-closed^{commit}` 与 Closure Report 为准。
+本阶段 §18 登记的证据缺口与 §2 Non-Goals 排除项在 §7 如实转记，**未关闭、未豁免**。
 
 **Phase 4 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 4–6 条目来自早期路线图，
 尚未重新论证（Phase 4 的 byte-duplicate 部分已在 Phase 2 以只读派生形式完成）。
@@ -164,7 +177,7 @@ Freeze Record 补齐提交 `fe0cbcb`（`docs(phase3.3): record contract freeze`�
 | 3 | `docs/phase3/PHASE3_2_LOG.md` 顶部状态与后文（§17 / §18）及 Closure Report 互相取代但缺终态说明 | 已于 2026-10-10 在顶部追加「最终状态索引」，历史章节未删改 |
 | 4 | `PHASE3_0_DECISION_REPORT.md` 与 Contract 的 `display_name` 描述不一致 | 已于 2026-10-10 在顶部追加权威指针；原文未改写 |
 | 5 | Phase 1 / Phase 2 历史报告中的早期路线图表述（如「重复检测属 Phase 4」） | **不处理**（历史报告不改写；现行描述已在本文件与 ARCHITECTURE 修正） |
-| 6 | `README.md` 状态行「下一步：Phase 3.3 及以后为**待规划方向（未冻结）**」与其路线图行、`docs/ARCHITECTURE.md` §10 路线图行的「3.3 及以后**未冻结**」—— 与 Phase 3.3 契约已于 2026-10-13 冻结（见 §4）不符 | **本轮只登记，不处理**：这两个文件不在本任务允许修改范围（仅 `docs/PROJECT_STATE.md`）；如需同步，应由后续获授权的文档修订处理 |
+| 6 | `README.md` 状态行「下一步：Phase 3.3 及以后为**待规划方向（未冻结）**」与其路线图行、`docs/ARCHITECTURE.md` §10 路线图行的「3.3 及以后**未冻结**」—— 与 Phase 3.3 契约已于 2026-10-13 冻结（见 §4）不符 | **已处置**：该两文件已由 `26a73c2`（2026-10-15）同步为「3.3 契约已冻结、实施未开始」；本轮 Phase 3.3 关闭时又经授权同步为「3.3 CLOSED / CONDITIONAL PASS」。本行登记关闭（历史记录保留） |
 
 ---
 
@@ -179,6 +192,20 @@ U1 / U3 / U4 / U5 **均无真实使用证据**；U2 仅有实现进度（Phase 3
 **不构成证据**。补充（2026-10-14）：U2 的**排期**已由用户以 Option B 裁决
 （core→CLI 先行，见 §4 Phase 3.3 冻结记录），但该裁决**不构成证据**，
 **真实入口偏好**仍无数据，U2 **不因此关闭**。
+
+**Phase 3.3 关闭时的转记（2026-10-15，事实）**：Phase 3.3 以
+**`CONDITIONAL PASS`** 结束，其冻结契约 §18 登记的各项**在关闭时仍未关闭**，如实转记、**不作豁免**：
+
+| 项 | 关闭时状态 |
+| :--- | :--- |
+| U1 真实组织需求与标签粒度 | **开放**：真实使用证据仍不足；真实持久库记录为 `resources=0` / `tags=0`；本阶段筛选仅在合成库与真实样本库上验证，不构成真实使用证据 |
+| U2 GUI 侧入口偏好 | **开放**：core → CLI 的**排期**已由用户以 Option B 裁决；**GUI 偏好证据**仍无数据 |
+| U3 组织范围是否全局 | **已由 Phase 3.2 冻结为 GLOBAL**；本阶段沿用、不重新打开 |
+| 性能 benchmark | **未要求实施**（属冻结契约 §2-13 Non-Goal）；未做基准 |
+| `game` + `card_marker` 设计意图 | **待核实**：两者同时提供时产生两个 `r.card_marker = ?` AND 子句（已核实）；文档未记录意图，本阶段保留既有行为 |
+
+上游 `PHASE3_0_CONTRACT.md` §14.3 的 U4 / U5 属**上游登记项**，不属 Phase 3.3 范围（其关联能力已被
+Phase 3.3 契约 §2-10 排除），**不得**扩展为本阶段的实施内容或验收条件。
 
 ---
 
@@ -200,6 +227,8 @@ U1 / U3 / U4 / U5 **均无真实使用证据**；U2 仅有实现进度（Phase 3
 - 架构：[ARCHITECTURE.md](./ARCHITECTURE.md)
 - Phase 3 首期冻结 Contract：[phase3/PHASE3_0_CONTRACT.md](./phase3/PHASE3_0_CONTRACT.md)
 - Phase 3.3 冻结 Contract（FROZEN，2026-10-13）：[phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md)
+- Phase 3.3 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-15）：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)
+- Phase 3.3 实施日志（含证据修订说明）：[phase3/PHASE3_3_LOG.md](./phase3/PHASE3_3_LOG.md)
 - Phase 3.2 实施日志（含最终状态索引）：[phase3/PHASE3_2_LOG.md](./phase3/PHASE3_2_LOG.md)
 - 证据缺口登记：[phase3/PHASE3_0_OPEN_EVIDENCE.md](./phase3/PHASE3_0_OPEN_EVIDENCE.md)
 - 项目简介：[../README.md](../README.md)
