@@ -24,7 +24,15 @@ import json
 import sys
 from typing import Any
 
-from core.query import AuthorQuery, ModQuery, PluginQuery, ResourceQuery, UsageQuery
+from core.query import (
+    AuthorQuery,
+    ModQuery,
+    PluginQuery,
+    ResourceFilter,
+    ResourceQuery,
+    TagQuery,
+    UsageQuery,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +262,17 @@ def _duplicate_group_lines(group) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _resource_list_scope(args) -> dict:
+def _resource_list_scope(args, tag_id: int | None = None) -> dict:
+    """``query resources`` 的 JSON ``scope``：**仅**输出实际提供的筛选参数。
+
+    Phase 3.3 新增键沿用同一条「非 ``None`` 才输出」规则：
+
+    - ``tag_id``：仅在 ``--tag`` **解析成功**时加入（``tag_id`` 由调用方传入）；
+    - ``favorite``：仅在提供 ``--favorite`` / ``--no-favorite`` 时加入（``True`` / ``False``）。
+
+    ``scope`` 是**对外** JSON 字段（既有契约面），不是
+    ``ResourceFilter.to_params()`` 的序列化 —— 后者恒为 15 键且允许 ``None``。
+    """
     scope = {}
     for key, value in (
         ("resource_type", args.resource_type),
@@ -266,6 +284,8 @@ def _resource_list_scope(args) -> dict:
         ("plugin_guid", args.plugin_guid),
         ("property_category", args.category),
         ("has_mods", args.has_mods),
+        ("tag_id", tag_id),
+        ("favorite", args.favorite),
     ):
         if value is not None:
             scope[key] = value
@@ -273,6 +293,28 @@ def _resource_list_scope(args) -> dict:
 
 
 def cmd_resources(conn, args) -> int:
+    # ``--tag`` 接受**标签名称**（不接受 id）：名称解析只发生在 CLI 层，全程只读。
+    tag_id: int | None = None
+    if args.tag is not None:
+        tag = TagQuery(conn).find_by_name(args.tag)
+        if tag is None:
+            # 与既有 ``query resource <target>`` / ``query mod <guid>`` 同类的
+            # not-found 约定：stderr + 退出码 1，且**不执行任何查询**
+            # （``--json`` 时 stdout 同样不输出任何内容）。
+            return _not_found("Tag", args.tag)
+        tag_id = tag.id
+
+    # 新增筛选条件**只**经 Query Model 进入（不新增第二套条件语义）：
+    # 仅从 ``to_params()`` 取出新增的 ``tag_id`` / ``favorite`` 两项与既有参数合并。
+    # 禁止整表展开 15 键 —— 会产生重复关键字（如 ``resource_type`` 传两次），
+    # 或用模型默认的 ``None`` 覆盖既有筛选值。
+    new_params = {
+        key: value
+        for key, value in ResourceFilter(
+            tag_id=tag_id, favorite=args.favorite
+        ).to_params().items()
+        if key in ("tag_id", "favorite")
+    }
     rows = ResourceQuery(conn).list(
         resource_type=args.resource_type,
         game=args.game,
@@ -283,6 +325,7 @@ def cmd_resources(conn, args) -> int:
         plugin_guid=args.plugin_guid,
         property_category=args.category,
         has_mods=args.has_mods,
+        **new_params,
         order_by=args.order,
         descending=args.desc,
         limit=args.limit,
@@ -290,7 +333,7 @@ def cmd_resources(conn, args) -> int:
     )
     payload = {
         "count": len(rows),
-        "scope": _resource_list_scope(args),
+        "scope": _resource_list_scope(args, tag_id=tag_id),
         "resources": [_resource_obj(r) for r in rows],
     }
     lines = [f"Resources: {len(rows)}"]
@@ -689,6 +732,18 @@ def add_query_parser(sub) -> None:
         "--plugin", dest="plugin_guid", default=None, help="按使用的插件 guid 过滤"
     )
     resources.add_argument("--category", default=None, help="按 property 语义类别过滤")
+    resources.add_argument(
+        "--tag", default=None, help="按标签名称精确筛选（大小写不敏感；非模糊匹配）"
+    )
+    favorite_group = resources.add_mutually_exclusive_group()
+    favorite_group.add_argument(
+        "--favorite", dest="favorite", action="store_const", const=True, default=None,
+        help="只看已收藏资源",
+    )
+    favorite_group.add_argument(
+        "--no-favorite", dest="favorite", action="store_const", const=False,
+        help="只看未收藏资源",
+    )
     mods_group = resources.add_mutually_exclusive_group()
     mods_group.add_argument(
         "--with-mods", dest="has_mods", action="store_const", const=True, default=None,

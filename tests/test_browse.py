@@ -14,6 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core.app import TagWriteService  # noqa: E402
 from core.database import db as database  # noqa: E402
 from core.database import schema as schema_mod  # noqa: E402
 from core.library import LibraryStore  # noqa: E402
@@ -626,3 +627,92 @@ def test_real_sample_browse_is_read_only(real_db) -> None:
         == 0
     )
     assert conn.execute("SELECT count(*) AS c FROM resources").fetchone()["c"] == before_resources
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.3 —— BrowserScope 新增 tag_id / favorite（T-Q / T-R 补充）
+# ---------------------------------------------------------------------------
+
+
+def test_scope_filters_project_model_params_exactly() -> None:
+    """``filters()`` 必须是 ``to_filter().to_params()`` 在 14 键上的**投影**。"""
+    scope = BrowserScope(
+        query="x", tag_id=7, favorite=False, order_by="name", descending=True
+    )
+    params = scope.to_filter().to_params()
+    filters = scope.filters()
+
+    assert tuple(filters) == BrowserScope.FILTER_KEYS
+    assert len(filters) == 14
+    for key in BrowserScope.FILTER_KEYS:
+        assert filters[key] == params[key], key
+
+    # 模型 15 键（含 GUI 不暴露的 card_marker）⇒ 与 filters() 必然不等。
+    assert len(params) == 15
+    assert filters != params
+    assert "card_marker" not in filters
+    assert params["card_marker"] is None
+
+    assert filters["tag_id"] == 7
+    assert filters["favorite"] is False
+    assert filters["query"] == "x"
+
+
+def test_scope_model_keys_are_accepted_by_query_layer() -> None:
+    """T-R：filters() 的键必须都是 count / list 的合法参数（防漂移）。"""
+    count_params = set(inspect.signature(ResourceQuery.count).parameters)
+    list_params = set(inspect.signature(ResourceQuery.list).parameters)
+    filters = BrowserScope(tag_id=1, favorite=True).filters()
+    assert set(filters) <= count_params
+    assert set(filters) <= list_params
+    # 新增的两个键确实落在合法参数面内
+    assert {"tag_id", "favorite"} <= count_params
+    assert {"tag_id", "favorite"} <= list_params
+
+
+def test_page_supports_tag_and_favorite_scope(seeded) -> None:
+    writer = TagWriteService(seeded)
+    alpha = writer.create_tag("Alpha")
+    writer.assign_tag(1, alpha)
+    writer.assign_tag(2, alpha)
+    writer.set_favorite(2, True)
+
+    service = BrowseService(seeded)
+    rq = ResourceQuery(seeded)
+
+    assert _ids(service.page(BrowserScope(tag_id=alpha))) == [1, 2]
+    assert service.page(BrowserScope(tag_id=alpha)).total == 2
+    assert _ids(service.page(BrowserScope(favorite=True))) == [2]
+    assert _ids(service.page(BrowserScope(tag_id=alpha, favorite=True))) == [2]
+    assert _ids(service.page(BrowserScope(tag_id=alpha, favorite=False))) == [1]
+
+    for scope in (
+        BrowserScope(tag_id=alpha),
+        BrowserScope(favorite=True),
+        BrowserScope(favorite=False),
+        BrowserScope(tag_id=alpha, favorite=True),
+    ):
+        assert service.page(scope).total == rq.count(**scope.filters())
+
+
+def test_page_with_new_filters_does_not_write(seeded) -> None:
+    writer = TagWriteService(seeded)
+    alpha = writer.create_tag("Alpha")
+    writer.assign_tag(1, alpha)
+    writer.set_favorite(1, True)
+
+    before_changes = seeded.total_changes
+    before_counts = {
+        table: seeded.execute(f"SELECT count(*) AS c FROM {table}").fetchone()["c"]
+        for table in ("resources", "tags", "resource_tags")
+    }
+    service = BrowseService(seeded)
+    service.page(BrowserScope(tag_id=alpha), limit=3)
+    service.page(BrowserScope(favorite=True), with_review_reasons=True)
+    service.page(BrowserScope(tag_id=alpha, favorite=False))
+
+    assert seeded.total_changes == before_changes
+    assert {
+        table: seeded.execute(f"SELECT count(*) AS c FROM {table}").fetchone()["c"]
+        for table in ("resources", "tags", "resource_tags")
+    } == before_counts

@@ -48,6 +48,7 @@ from core.query.dto import (
     ReviewReason,
     TagSummary,
 )
+from core.query.model import ResourceFilter
 from core.query.property_map import (
     ALL_PROPERTY_TOKENS,
     PROPERTY_CATEGORIES,
@@ -99,6 +100,8 @@ __all__ = [
     "BrowsePage",
     "BrowserScope",
     "ResourceListItem",
+    # Query Model（Phase 3.3）
+    "ResourceFilter",
     # 查询 API
     "ResourceQuery",
     "LibraryQuery",

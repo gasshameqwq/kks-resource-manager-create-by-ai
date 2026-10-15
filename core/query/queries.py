@@ -286,6 +286,8 @@ def _resource_where(
     has_mods: bool | None,
     has_missing_mods: bool | None,
     query: str | None,
+    tag_id: int | None,
+    favorite: bool | None,
 ) -> tuple[list[str], list[object]]:
     clauses: list[str] = []
     params: list[object] = []
@@ -357,6 +359,26 @@ def _resource_where(
             fragment, text_params = text_clause
             clauses.append(fragment)
             params.extend(text_params)
+    if tag_id is not None:
+        # Phase 3.3（契约 §6.1.1）：按单个 Tag 的 surrogate id 筛选。
+        # 未知 / 0 / 负数 id 自然匹配不到任何行 ⇒ 空结果，不抛异常（契约 §4.4）。
+        clauses.append(
+            "EXISTS (SELECT 1 FROM resource_tags rt"
+            " WHERE rt.resource_id = r.id AND rt.tag_id = ?)"
+        )
+        params.append(tag_id)
+    if favorite is not None:
+        # Phase 3.3（契约 §6.1.2 / §6.1.3）：Favorite 判据与既有权威只读路径
+        # ``TagQuery.is_favorite()`` 保持一致（同为 JOIN ``tags t`` + ``name_key``），
+        # 仅在**外层查询形态**上使用 correlated EXISTS / NOT EXISTS。
+        # 不使用 ``resources`` 的任何收藏列（不存在），也不新建收藏表。
+        exists = "EXISTS" if favorite else "NOT EXISTS"
+        clauses.append(
+            f"{exists} (SELECT 1 FROM resource_tags rt"
+            " JOIN tags t ON t.id = rt.tag_id"
+            " WHERE rt.resource_id = r.id AND t.name_key = ?)"
+        )
+        params.append(FAVORITE_TAG_KEY)
 
     return clauses, params
 
@@ -485,6 +507,8 @@ class ResourceQuery:
         has_mods: bool | None = None,
         has_missing_mods: bool | None = None,
         query: str | None = None,
+        tag_id: int | None = None,
+        favorite: bool | None = None,
     ) -> int:
         clauses, params = _resource_where(
             self.conn,
@@ -501,6 +525,8 @@ class ResourceQuery:
             has_mods=has_mods,
             has_missing_mods=has_missing_mods,
             query=query,
+            tag_id=tag_id,
+            favorite=favorite,
         )
         sql = "SELECT count(*) AS c FROM resources r"
         if clauses:
@@ -524,6 +550,8 @@ class ResourceQuery:
         has_mods: bool | None = None,
         has_missing_mods: bool | None = None,
         query: str | None = None,
+        tag_id: int | None = None,
+        favorite: bool | None = None,
         order_by: str = "id",
         descending: bool = False,
         limit: int | None = None,
@@ -555,6 +583,8 @@ class ResourceQuery:
             has_mods=has_mods,
             has_missing_mods=has_missing_mods,
             query=query,
+            tag_id=tag_id,
+            favorite=favorite,
         )
         return _resource_summary_query(
             self.conn,

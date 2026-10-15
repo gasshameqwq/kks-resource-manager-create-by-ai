@@ -18,9 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import main as cli  # noqa: E402
 import cli_query as cli_query_module  # noqa: E402
+from core.app import TagWriteService  # noqa: E402
 from core.database import db as database  # noqa: E402
 from core.library import LibraryStore  # noqa: E402
-from core.query import ModQuery, ResourceQuery  # noqa: E402
+from core.query import ModQuery, ResourceQuery, TagQuery  # noqa: E402
 from core.scanner import LibraryScanner  # noqa: E402
 from tests import builders  # noqa: E402
 
@@ -584,3 +585,195 @@ def test_sample_cli_does_not_modify_database(sample_cli, capsys):
         assert cli.main(argv) == 0
     capsys.readouterr()
     assert _sha256(db_file) == before, "真实样本 CLI 查询不得修改数据库"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.3 —— CLI 最小只读筛选入口（T-O / T-P / T-S）
+# ---------------------------------------------------------------------------
+
+
+def _seed_cli_tags(data_dir: Path) -> dict:
+    """用户 Tag ``Alpha`` → 两张 ``character_card``；Favorite → 第 2 张卡 + 第 1 个 MOD。
+
+    按 ``resource_type`` 选取（而非按 id 位置），避免依赖扫描入库顺序。
+    写侧经 ``TagWriteService``（Phase 3.2 唯一 writer）；测试后续的读侧全程只读。
+    """
+    conn = database.connect(data_dir / "kks_resource_manager.db")
+    try:
+        cards = [row.id for row in ResourceQuery(conn).list(resource_type="character_card")]
+        mods = [row.id for row in ResourceQuery(conn).list(resource_type="mod")]
+        writer = TagWriteService(conn)
+        alpha = writer.create_tag("Alpha")
+        writer.assign_tag(cards[0], alpha)
+        writer.assign_tag(cards[1], alpha)
+        writer.set_favorite(cards[1], True)
+        writer.set_favorite(mods[0], True)
+        return {
+            "alpha": alpha,
+            "cards": cards,
+            "mods": mods,
+            "favorites": sorted([cards[1], mods[0]]),
+        }
+    finally:
+        conn.close()
+
+
+def test_query_resources_tag_matches_query_layer(cli_lib, capsys):
+    seeded = _seed_cli_tags(cli_lib)
+    capsys.readouterr()
+
+    assert cli.main(["query", "resources", "--tag", "Alpha", "--json"]) == 0
+    payload = _json_out(capsys)
+
+    conn = database.connect(cli_lib / "kks_resource_manager.db")
+    try:
+        expected = [row.id for row in ResourceQuery(conn).list(tag_id=seeded["alpha"])]
+    finally:
+        conn.close()
+
+    assert [r["id"] for r in payload["resources"]] == expected
+    assert payload["count"] == len(expected) == 2
+    assert payload["scope"]["tag_id"] == seeded["alpha"]
+    assert "favorite" not in payload["scope"]
+
+
+def test_query_resources_tag_accepts_casing_and_exact_name_only(cli_lib, capsys):
+    _seed_cli_tags(cli_lib)
+    capsys.readouterr()
+    # 大小写不敏感（精确 name_key）
+    assert cli.main(["query", "resources", "--tag", "alpha", "--json"]) == 0
+    assert _json_out(capsys)["count"] == 2
+    # 非模糊 / 非前缀：不命中就是 not-found（退出码 1）
+    assert cli.main(["query", "resources", "--tag", "Alph"]) == 1
+    assert "Tag not found: Alph" in capsys.readouterr().err
+    assert cli.main(["query", "resources", "--tag", "Alpha%"]) == 1
+    assert "Tag not found: Alpha%" in capsys.readouterr().err
+
+
+def test_query_resources_favorite_and_no_favorite(cli_lib, capsys):
+    seeded = _seed_cli_tags(cli_lib)
+    all_ids = seeded["cards"] + seeded["mods"]
+    capsys.readouterr()
+
+    assert cli.main(["query", "resources", "--favorite", "--json"]) == 0
+    payload = _json_out(capsys)
+    assert payload["scope"]["favorite"] is True
+    assert [r["id"] for r in payload["resources"]] == seeded["favorites"]
+
+    assert cli.main(["query", "resources", "--no-favorite", "--json"]) == 0
+    payload = _json_out(capsys)
+    assert payload["scope"]["favorite"] is False
+    returned = {r["id"] for r in payload["resources"]}
+    assert returned == set(all_ids) - set(seeded["favorites"])
+
+
+def test_query_resources_scope_only_lists_provided_filters(cli_lib, capsys):
+    seeded = _seed_cli_tags(cli_lib)
+    capsys.readouterr()
+
+    assert cli.main(["query", "resources", "--json"]) == 0
+    scope = _json_out(capsys)["scope"]
+    assert "tag_id" not in scope
+    assert "favorite" not in scope
+
+    # 与新参数同用时，scope 与既有键遵循同一条「非 None 才输出」规则。
+    assert cli.main(
+        ["query", "resources", "--tag", "Alpha", "--favorite", "--json"]
+    ) == 0
+    payload = _json_out(capsys)
+    assert payload["scope"] == {"tag_id": seeded["alpha"], "favorite": True}
+    assert [r["id"] for r in payload["resources"]] == [seeded["cards"][1]]
+
+
+def test_query_resources_new_filters_combine_with_existing_ones_as_and(
+    cli_lib, capsys
+):
+    seeded = _seed_cli_tags(cli_lib)
+    capsys.readouterr()
+
+    assert cli.main(
+        ["query", "resources", "--tag", "Alpha", "--type", "character_card", "--json"]
+    ) == 0
+    assert _json_out(capsys)["count"] == 2
+
+    assert cli.main(
+        ["query", "resources", "--tag", "Alpha", "--type", "mod", "--json"]
+    ) == 0
+    payload = _json_out(capsys)
+    assert payload["count"] == 0
+    assert payload["resources"] == []
+    assert payload["scope"]["tag_id"] == seeded["alpha"]
+    assert payload["scope"]["resource_type"] == "mod"
+
+
+def test_query_resources_tag_not_found_is_not_traceback(cli_lib, capsys):
+    capsys.readouterr()
+    # 文本模式
+    assert cli.main(["query", "resources", "--tag", "NoSuchTag"]) == 1
+    captured = capsys.readouterr()
+    assert "Tag not found: NoSuchTag" in captured.err
+    assert captured.out == ""
+    # JSON 模式同样不输出任何内容
+    assert cli.main(["query", "resources", "--tag", "NoSuchTag", "--json"]) == 1
+    captured = capsys.readouterr()
+    assert "Tag not found: NoSuchTag" in captured.err
+    assert captured.out == ""
+    # 空 / 纯空白名称归一化后为空 ⇒ 同样 not-found
+    assert cli.main(["query", "resources", "--tag", "   "]) == 1
+    assert "Tag not found:" in capsys.readouterr().err
+
+
+def test_query_resources_empty_result_with_new_filters_is_success(
+    cli_lib, capsys
+):
+    seeded = _seed_cli_tags(cli_lib)
+    capsys.readouterr()
+
+    assert cli.main(["query", "resources", "--tag", "Alpha", "--type", "mod"]) == 0
+    assert "(no results)" in capsys.readouterr().out
+
+    assert cli.main(
+        ["query", "resources", "--tag", "Alpha", "--type", "mod", "--json"]
+    ) == 0
+    payload = _json_out(capsys)
+    assert payload["count"] == 0
+    assert payload["resources"] == []
+    assert payload["scope"]["tag_id"] == seeded["alpha"]
+
+
+def test_query_resources_favorite_flags_are_mutually_exclusive(cli_lib):
+    _seed_cli_tags(cli_lib)
+    with pytest.raises(SystemExit) as excinfo:
+        cli.main(["query", "resources", "--favorite", "--no-favorite"])
+    assert excinfo.value.code == 2
+
+
+def test_query_resources_new_filters_do_not_modify_database(cli_lib, capsys):
+    _seed_cli_tags(cli_lib)
+    db_file = cli_lib / "kks_resource_manager.db"
+    before = _sha256(db_file)
+    conn = database.connect(db_file)
+    try:
+        before_tag_keys = [tag.name_key for tag in TagQuery(conn).list()]
+    finally:
+        conn.close()
+
+    capsys.readouterr()
+    for argv in (
+        ["query", "resources", "--tag", "Alpha"],
+        ["query", "resources", "--favorite"],
+        ["query", "resources", "--no-favorite"],
+        ["query", "resources", "--tag", "Alpha", "--favorite", "--json"],
+        ["query", "resources", "--tag", "NoSuchTag"],
+        ["query", "resources", "--tag", "   "],
+    ):
+        cli.main(argv)
+    capsys.readouterr()
+
+    assert _sha256(db_file) == before, "新增只读筛选不得修改数据库文件"
+    conn = database.connect(db_file)
+    try:
+        # 读路径不得创建任何 Tag（含 not-found 分支与系统 Tag bootstrap）
+        assert [tag.name_key for tag in TagQuery(conn).list()] == before_tag_keys
+    finally:
+        conn.close()

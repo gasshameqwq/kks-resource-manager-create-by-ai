@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+from typing import ClassVar
 
 from core.query.dto import (
     AuthorSummary,
@@ -39,6 +40,7 @@ from core.query.dto import (
     ReviewReason,
     TagSummary,
 )
+from core.query.model import ResourceFilter
 from core.query.queries import (
     AuthorQuery,
     LibraryQuery,
@@ -69,29 +71,69 @@ class BrowserScope:
     plugin_guid: str | None = None
     author_id: int | None = None
     property_category: str | None = None
+    tag_id: int | None = None
+    favorite: bool | None = None
     order_by: str = "id"
     descending: bool = False
 
+    #: GUI 作用域真正装配的筛选键集：既有 12 键 + Phase 3.3 新增的 ``tag_id`` / ``favorite``。
+    #:
+    #: ``ResourceQuery.count`` / ``list`` 的筛选面为 **15** 项（多一个 GUI 不暴露的
+    #: ``card_marker``），因此 :meth:`filters` 是本键集上的**投影**，
+    #: 与 ``to_filter().to_params()``（15 键）**必然不等** —— 不得用字典相等做断言。
+    FILTER_KEYS: ClassVar[tuple[str, ...]] = (
+        "query",
+        "resource_type",
+        "game",
+        "library_id",
+        "scan_status",
+        "needs_review",
+        "has_mods",
+        "has_missing_mods",
+        "mod_guid",
+        "plugin_guid",
+        "author_id",
+        "property_category",
+        "tag_id",
+        "favorite",
+    )
+
+    def to_filter(self) -> ResourceFilter:
+        """作用域 → :class:`ResourceFilter`：GUI 条件的**唯一**字段值映射实现。
+
+        字段语义与 ``ResourceQuery.count`` / ``list`` 的对应参数完全一致，
+        本方法只做搬运，不重新定义语义、不新增校验。
+        """
+        return ResourceFilter(
+            query=self.query,
+            resource_type=self.resource_type,
+            game=self.game,
+            card_marker=None,
+            library_id=self.library_id,
+            scan_status=self.scan_status,
+            needs_review=self.needs_review,
+            has_mods=self.has_mods,
+            has_missing_mods=self.has_missing_mods,
+            mod_guid=self.mod_guid,
+            plugin_guid=self.plugin_guid,
+            author_id=self.author_id,
+            property_category=self.property_category,
+            tag_id=self.tag_id,
+            favorite=self.favorite,
+        )
+
     def filters(self) -> dict[str, object]:
-        """作用域 → ``ResourceQuery`` 筛选参数的**唯一**转换点。
+        """作用域 → ``ResourceQuery`` 筛选参数的**唯一**转换点（键投影）。
 
         ``page()`` 的 ``count`` 与 ``list`` 都使用本方法的返回值，
         因此不存在「两条路径参数不一致」的可能（调用方也不需要各自拼一遍）。
+
+        实现上**只做键投影**：先经 :meth:`to_filter` 完成唯一的字段值映射，
+        再按 :data:`FILTER_KEYS` 取子集。返回值**恰好**包含这 14 个键，
+        且键恒存在、值可为 ``None``（与 ``ResourceQuery`` 的默认值语义一致）。
         """
-        return {
-            "query": self.query,
-            "resource_type": self.resource_type,
-            "game": self.game,
-            "library_id": self.library_id,
-            "scan_status": self.scan_status,
-            "needs_review": self.needs_review,
-            "has_mods": self.has_mods,
-            "has_missing_mods": self.has_missing_mods,
-            "mod_guid": self.mod_guid,
-            "plugin_guid": self.plugin_guid,
-            "author_id": self.author_id,
-            "property_category": self.property_category,
-        }
+        params = self.to_filter().to_params()
+        return {key: params[key] for key in self.FILTER_KEYS}
 
 
 @dataclass(frozen=True)
