@@ -155,9 +155,13 @@ annotated tag `phase-3.3-closed` 指向该收尾提交；完成时核验 `HEAD =
 [phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md)，
 状态 **FROZEN**（2026-10-17，冻结提交 `632eb4c`，`docs(phase3.4): freeze implementation contract`）。
 G-2 实施已完成（零功能增量：仅核验 + 文档 + 测试），**无生产代码变更**；全量测试
-`943 passed`（来源 `PHASE3_4_LOG.md` §5.2）。实施报告见
+`943 passed`（实施轮 52.07 s；G-3 提交前复跑 43.07 s，来源 `PHASE3_4_LOG.md` §5.2 / §9）。
+Implementation commit：`ef362fd19e79a67dd496ef5751393244844131a2`
+（`test(phase3.4): verify display name and effective type behavior`，8 files，+459/−21）。
+G-3 的提交前核验、focused/全量测试、implementation commit 与提交后核验已完成；
+**Phase 3.4 tag 尚未创建，push 尚未执行**。实施报告见
 [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)。
-**阶段尚未 CLOSED**（待用户验收）；G-3（commit / tag / push）未授权、未执行。
+**阶段尚未 CLOSED**（待最终收尾与阶段关闭验收）。
 
 **Phase 4 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 4–6 条目来自早期路线图，
 尚未重新论证（Phase 4 的 byte-duplicate 部分已在 Phase 2 以只读派生形式完成）。

@@ -3,7 +3,7 @@
 > 文档类型：**Implementation Log**（过程与实测记录；不构成契约，不替代验收结论）
 > 依据：`docs/phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md`（**FROZEN**，2026-10-17，冻结提交 `632eb4c`）
 > 日期：2026-10-17
-> 范围：IS1 / IS2 / IS4 / IS5；IS6 收尾轮另见 Closure Report。
+> 范围：IS1 / IS2 / IS4 / IS5；IS6 收尾与 G-3 提交记录见 §9 与 Closure Report。
 
 ---
 
@@ -109,6 +109,16 @@ MIGRATIONS [1, 2]
 CURRENT_TABLES 16
 ```
 
+### 5.5 G-3 提交前复跑（2026-10-17）
+
+```text
+.venv\Scripts\python.exe -m pytest tests/test_search_core.py tests/test_database_schema.py tests/test_query_model.py -q -k "display_name_override or old_name_still_matches or fts_index_updates or user_type_override_filters"
+5 passed, 134 deselected in 0.19s
+
+.venv\Scripts\python.exe -m pytest -q
+943 passed in 43.07s
+```
+
 ---
 
 ## 6. 契约不变量核对
@@ -136,6 +146,8 @@ CURRENT_TABLES 16
 6. **既有文档漂移（范围外）**：`docs/PROJECT_STATE.md` §4「Phase 3.3 冻结记录」段仍保留
    「3.3 功能实施尚未开始、阶段未关闭」的冻结时点表述；同节后续「Phase 3.3 实施与关闭记录
    （2026-10-15）」已取代该状态。该文本属 3.3 历史记录，未在本阶段修改，登记为范围外待办。
+7. **T-A2 未直接断言 `display_name` 最终写入值**：该用例只验证覆盖后旧 `name` 仍命中；
+   写服务生效由 T-A1 覆盖，属非阻断的测试独立性改进点。
 
 ---
 
@@ -149,4 +161,22 @@ CURRENT_TABLES 16
 | 新增测试文件 | ✅ 未做 |
 | 改变搜索语义 / `--type` / API | ✅ 未做 |
 | 新增 schema / 索引 / DTO / Taxonomy | ✅ 未做 |
-| 创建 commit / tag / push | ✅ 未做（留待 G-3） |
+| 创建 implementation commit | ✅ 已完成（`ef362fd`） |
+| 创建 tag | ❌ 未执行（待授权） |
+| push | ❌ 未执行 |
+
+---
+
+## 9. G-3 执行记录（事实，2026-10-17）
+
+- 执行前 HEAD：`632eb4c7dcaa593208c2a52911273896cbb2cef7`；工作区 clean；
+  冻结契约 blob `b7b4ab7bb311c280b95472b2fa55950cab29aace` 未变。
+- focused：`5 passed, 134 deselected in 0.19s`（exit 0）。
+- 全量：`943 passed in 43.07s`（exit 0）。
+- Implementation commit：`ef362fd19e79a67dd496ef5751393244844131a2`；
+  父提交 `632eb4c7dcaa593208c2a52911273896cbb2cef7`；
+  message `test(phase3.4): verify display name and effective type behavior`；
+  8 files changed，459 insertions(+)，21 deletions(-)。
+- 提交后 `git status --short` 为空；冻结契约 blob 未变。
+- Phase 3.4 tag：**未创建**；push：**未执行**。
+- 阶段状态：**IMPLEMENTATION COMPLETE / PENDING USER ACCEPTANCE**（未 CLOSED）。

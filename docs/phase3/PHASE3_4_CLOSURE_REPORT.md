@@ -49,6 +49,17 @@ Git 收尾仍由用户决定。
 | 生产代码 diff | 空 |
 | 契约 blob | 与 `HEAD:` 一致 |
 
+### Git
+
+| 项 | 值 |
+| :--- | :--- |
+| Implementation commit | `ef362fd19e79a67dd496ef5751393244844131a2` |
+| 父提交 | `632eb4c7dcaa593208c2a52911273896cbb2cef7` |
+| Message | `test(phase3.4): verify display name and effective type behavior` |
+| 文件 / 统计 | 8 files changed, 459 insertions(+), 21 deletions(-) |
+| Phase 3.4 tag | **未创建** |
+| Push | **未执行** |
+
 ### Definition of Done 核对
 
 | # | 条件 | 结果 |
@@ -73,17 +84,20 @@ Git 收尾仍由用户决定。
 
 - 本阶段只做核验 + 文档 + 测试；未修改 `core/**`、`cli_query.py`、`main.py`、`ui/**`、schema、迁移或 DTO。
 - 未改变 `display_name` 搜索语义；未给 `--type` 增加校验；Resource Taxonomy 继续暂缓。
-- 未执行 G-3：无 commit、tag、push。
+- G-3 的提交前核验、focused/全量测试、implementation commit `ef362fd` 与提交后核验已完成；
+  **Phase 3.4 tag 尚未创建，push 尚未执行**。
 - 状态行已同步为「实施完成，待用户验收」，**不是**「CLOSED」。
 
 ### Open Items
 
 1. **用户验收尚未作出**：阶段未 CLOSED。
-2. **G-3 未授权**：提交、tag、push 均未执行。
+2. **Tag / push 未执行**：implementation commit `ef362fd` 已创建；tag / push 等待后续授权。
 3. **r6 → 冻结版差异未独立验证**：历史证据限制继续保留，未因本轮实施而改变。
 4. **U1 / U2** 仍为 OPEN（真实组织需求 / GUI 入口偏好），不属本阶段阻断项。
 5. **`--type` 未知值静默空结果**：按冻结决定仅记录，未改行为。
 6. **性能 benchmark**：Non-Goal，未做。
+7. **T-A2 未直接断言 `display_name` 最终写入值**：T-A1 已覆盖写服务生效，属非阻断。
+8. **`PROJECT_STATE.md` 中 Phase 3.3 历史段落漂移**：同节后续关闭记录已取代；属范围外历史文本。
 
 ### Evidence
 
