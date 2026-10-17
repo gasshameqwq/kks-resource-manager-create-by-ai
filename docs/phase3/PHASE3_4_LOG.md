@@ -143,9 +143,10 @@ CURRENT_TABLES 16
 3. **`--type` 未知值静默空结果**：按冻结决定仅记录，未改行为。
 4. **性能 benchmark**：Non-Goal，未做。
 5. 本轮未修改 `PROJECT_STATE` / `README` 之外的状态内容；IS6 状态同步见 Closure Report。
-6. **既有文档漂移（范围外）**：`docs/PROJECT_STATE.md` §4「Phase 3.3 冻结记录」段仍保留
-   「3.3 功能实施尚未开始、阶段未关闭」的冻结时点表述；同节后续「Phase 3.3 实施与关闭记录
-   （2026-10-15）」已取代该状态。该文本属 3.3 历史记录，未在本阶段修改，登记为范围外待办。
+6. **既有文档漂移（关闭后已处置）**：`docs/PROJECT_STATE.md` §4「Phase 3.3 冻结记录」段
+   原先直接以当前状态口吻写「3.3 功能实施尚未开始、阶段未关闭」；实施轮未越界修改，
+   登记为范围外待办。2026-10-18 的关闭后文档维护已将该表述限定为冻结时点的历史状态，
+   并明确后续 Phase 3.3 已 `CLOSED / CONDITIONAL PASS`；不改变历史记录或 Phase 3.3 结论。
 7. **T-A2 未直接断言 `display_name` 最终写入值**：该用例只验证覆盖后旧 `name` 仍命中；
    写服务生效由 T-A1 覆盖，属非阻断的测试独立性改进点。
 
@@ -162,8 +163,8 @@ CURRENT_TABLES 16
 | 改变搜索语义 / `--type` / API | ✅ 未做 |
 | 新增 schema / 索引 / DTO / Taxonomy | ✅ 未做 |
 | 创建 implementation commit | ✅ 已完成（`ef362fd`） |
-| 创建 tag | ❌ 未执行（待授权） |
-| push | ❌ 未执行 |
+| 创建 tag（实施轮 / G-3 当时） | ❌ 当时未执行（阶段关闭后已完成，见 §10） |
+| push（实施轮 / G-3 当时） | ❌ 当时未执行（阶段关闭后已完成，见 §10） |
 
 ---
 
@@ -181,5 +182,18 @@ CURRENT_TABLES 16
   （`docs(phase3.4): correct finalization status`，3 files，+54/−6）。
 - 最终关闭提交：即本报告所在提交（自引用，不内嵌自身 hash）。
 - 提交后 `git status --short` 为空；冻结契约 blob 未变。
-- Phase 3.4 tag：**未创建**；push：**未执行**。
+- Phase 3.4 tag：**阶段关闭时未创建**；push：**阶段关闭时未执行**（后续见 §10）。
 - 阶段状态：**CLOSED / CONDITIONAL PASS**（2026-10-18）；非阻断事项见 Closure Report。
+
+---
+
+## 10. Post-Closure Publication（事实，2026-10-18）
+
+阶段关闭后完成的 tag/push 操作，不改变 `CLOSED / CONDITIONAL PASS` 结论：
+
+- Tag：`phase-3.4-closed`（annotated）
+- Tag object：`0cae547c7c21cc1a754b147726f022a3396d38c3`
+- Peeled commit：`6553333f832de03468af7945294002ba37d040ef`
+- Remote：`origin` → `https://github.com/gasshameqwq/kks-resource-manager-create-by-ai.git`
+- Push：已完成（仅推送 `refs/tags/phase-3.4-closed`）
+- Remote verification：`git ls-remote` 返回相同 tag object 与 peeled commit

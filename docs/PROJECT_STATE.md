@@ -1,9 +1,8 @@
 # PROJECT_STATE — 项目当前状态与权威文档入口
 
 > 文档类型：**当前状态登记（CURRENT STATE）**。不是冻结契约，不是阶段报告。
-> 最后更新：2026-10-15（§1 更新基线快照与关闭 tag；§3 新增 Phase 3.3 关闭行；§4 同步
-> Phase 3.3 实施完成 / 有条件验收 / 收尾事实与 Git 证据；§6 更新第 6 行处置状态；
-> §7 转记关闭时仍开放的事项；§9 新增 Phase 3.3 Closure Report 入口）
+> 最后更新：2026-10-18（修正 Phase 3.3 冻结段落中已过时的当前状态描述；
+> 将该项转记为后续文档维护已处理，不改变历史事件日期或阶段结论）
 >
 > 维护规则：
 > - 本文件只描述**当前**状态；历史结论仍以对应阶段报告为准，**不以本文件改写历史**。
@@ -99,7 +98,7 @@
 | Phase 3.1 | CLOSED / PASS（User Write Foundation） | [phase3/PHASE3_1_CLOSURE_REPORT.md](./phase3/PHASE3_1_CLOSURE_REPORT.md) | `phase-3.1-closed` |
 | Phase 3.2 | CLOSED / PASS（Tag System） | [phase3/PHASE3_2_CLOSURE_REPORT.md](./phase3/PHASE3_2_CLOSURE_REPORT.md) | `phase-3.2-closed` |
 | Phase 3.3 | **CLOSED / CONDITIONAL PASS**（Search & Query Foundation） | [phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md) | `phase-3.3-closed` |
-| Phase 3.4 | **CLOSED / CONDITIONAL PASS**（User Classification & Search） | [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md) | —（tag 未创建） |
+| Phase 3.4 | **CLOSED / CONDITIONAL PASS**（User Classification & Search） | [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md) | `phase-3.4-closed` |
 
 Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplicate / 2.3 查询暴露 /
 2.4 收尾审计）见 `docs/phase2/` 下的各阶段报告；Phase 1 内部划分见 `docs/phase1/`。
@@ -119,7 +118,7 @@ Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplic
 | 3.1 | User Write Foundation | ✅ 已完成（CLOSED / PASS） |
 | 3.2 | Tag System | ✅ 已完成（CLOSED / PASS） |
 | 3.3 | Search & Query Foundation | ✅ 已完成（**CLOSED / CONDITIONAL PASS**，2026-10-15；tag `phase-3.3-closed`；Closure Report：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)） |
-| 3.4 | User Classification & Search | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-18；契约 FROZEN；Closure Report：[phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)） |
+| 3.4 | User Classification & Search | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-18；契约 FROZEN；tag `phase-3.4-closed`；Closure Report：[phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)） |
 | 3.5 | CLI / GUI Integration | ⏳ **待规划方向**（未开始、未冻结） |
 | 3.6 | （无定义） | ⚠️ **定义缺失**：仅出现在路线图记录中，全仓无任何内容定义；**不视为已批准阶段**，本文件不代为定义，也不删除该条目 |
 
@@ -136,7 +135,10 @@ Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplic
 （`docs(phase3.3): freeze implementation contract`，单文件、897 行）·
 Freeze Record 补齐提交 `fe0cbcb`（`docs(phase3.3): record contract freeze`）。
 该契约**只冻结 Phase 3.3 自身**的范围、Query Model 定义、筛选语义、兼容性约束与测试不变式，
-**不冻结**本节路线图；3.3 的**功能实施尚未开始、尚未获得授权**，阶段**未关闭**（无 Closure、无 tag）。
+**不冻结**本节路线图。上述契约冻结时，3.3 的功能实施尚未开始、尚未获得授权，阶段尚未关闭
+（无 Closure、无 tag）；这是冻结时点的历史状态。后续事实见下方“Phase 3.3 实施与关闭记录
+（事实，2026-10-15）”：Phase 3.3 已完成实施和验收，当前为 **CLOSED / CONDITIONAL PASS**，
+并有 annotated tag `phase-3.3-closed`。该后续关闭不改变本段记录的冻结时点状态。
 
 **边界**：登记本路线图**不扩大** Phase 3 首期 Contract 的能力范围；
 任何 3.3 及以后的范围决策都必须另行评审（Contract §16 变更控制）——
@@ -161,11 +163,15 @@ Implementation commit：`ef362fd19e79a67dd496ef5751393244844131a2`
 （`test(phase3.4): verify display name and effective type behavior`，8 files，+459/−21）。
 文档状态修正 commit：`9e694cf1573ba744ec26f896fe36413a6ac483ff`
 （`docs(phase3.4): correct finalization status`，3 files，+54/−6）。
-G-3 的提交前核验、focused/全量测试、implementation commit 与提交后核验已完成；
-**Phase 3.4 tag 尚未创建，push 尚未执行**。实施/关闭报告见
+G-3 的提交前核验、focused/全量测试、implementation commit、文档修正 commit 与提交后核验已完成；
+**Phase 3.4 tag `phase-3.4-closed`（annotated，tag object
+`0cae547c7c21cc1a754b147726f022a3396d38c3`，peeled
+`6553333f832de03468af7945294002ba37d040ef`）已创建并推送至 `origin`**
+（`https://github.com/gasshameqwq/kks-resource-manager-create-by-ai.git`）。实施/关闭报告见
 [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)。
 **阶段已于 2026-10-18 CLOSED / CONDITIONAL PASS**；非阻断事项（T-A2 断言独立性、
-3.3 历史段落漂移、r6→冻结差异未独立验证、ARCHITECTURE 3.4 状态行）见 Closure Report。
+r6→冻结差异未独立验证）见 Closure Report。Phase 3.3 冻结段落中的过时当前状态描述
+已在 2026-10-18 的关闭后文档维护中修正；该项不再作为未解决漂移。
 
 **Phase 4 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 4–6 条目来自早期路线图，
 尚未重新论证（Phase 4 的 byte-duplicate 部分已在 Phase 2 以只读派生形式完成）。

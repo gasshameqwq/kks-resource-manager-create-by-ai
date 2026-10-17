@@ -20,7 +20,7 @@ CLOSED / CONDITIONAL PASS
 
 **有条件通过的来源**：核心实施与测试已完成，但仍有已记录的非阻断事项与历史证据限制
 （见 Open Items）；它们未被解决、未被豁免、未被标记为已验证。
-Phase 3.4 tag 尚未创建，push 尚未执行。
+**阶段关闭时** tag/push 尚未执行；其后已完成（见 Post-Closure Publication）。
 
 ### Contract
 
@@ -64,8 +64,21 @@ Phase 3.4 tag 尚未创建，push 尚未执行。
 | 文件 / 统计 | 8 files changed, 459 insertions(+), 21 deletions(-) |
 | 文档修正 commit | `9e694cf1573ba744ec26f896fe36413a6ac483ff`（3 files，+54/−6） |
 | 最终关闭提交 | 本报告所在提交（自引用，不内嵌） |
-| Phase 3.4 tag | **未创建** |
-| Push | **未执行** |
+| Phase 3.4 tag | 阶段关闭时未创建；后续已创建 `phase-3.4-closed`（见 Post-Closure Publication） |
+| Push | 阶段关闭时未执行；后续已推送至 `origin` |
+
+### Post-Closure Publication（2026-10-18）
+
+阶段关闭后完成的发布操作，不改变 `CLOSED / CONDITIONAL PASS` 结论：
+
+| 项 | 值 |
+| :--- | :--- |
+| Tag | `phase-3.4-closed`（annotated） |
+| Tag object | `0cae547c7c21cc1a754b147726f022a3396d38c3` |
+| Peeled commit | `6553333f832de03468af7945294002ba37d040ef` |
+| Remote | `origin` → `https://github.com/gasshameqwq/kks-resource-manager-create-by-ai.git` |
+| Push | 已完成（仅推送 `refs/tags/phase-3.4-closed`） |
+| Remote verification | `git ls-remote` 返回相同 tag object 与 peeled commit |
 
 ### Definition of Done 核对
 
@@ -92,23 +105,30 @@ Phase 3.4 tag 尚未创建，push 尚未执行。
 - 本阶段只做核验 + 文档 + 测试；未修改 `core/**`、`cli_query.py`、`main.py`、`ui/**`、schema、迁移或 DTO。
 - 未改变 `display_name` 搜索语义；未给 `--type` 增加校验；Resource Taxonomy 继续暂缓。
 - G-3 的提交前核验、focused/全量测试、implementation commit `ef362fd`、文档修正 commit
-  `9e694cf` 与提交后核验已完成；**Phase 3.4 tag 尚未创建，push 尚未执行**。
+  `9e694cf` 与提交后核验已完成；**阶段关闭时 tag/push 尚未执行；其后已完成**（见 Post-Closure Publication）。
 - `PROJECT_STATE.md` / `README.md` / 本报告 / `PHASE3_4_LOG.md` 已同步为
-  `CLOSED / CONDITIONAL PASS`；`docs/ARCHITECTURE.md` 的 3.4 状态行仍为
-  「实施完成，待用户验收」，本任务未授权修改，登记为非阻断后续项。
+  `CLOSED / CONDITIONAL PASS`；`docs/ARCHITECTURE.md` 的 3.4 状态行已在后续文档一致性修复中
+  同步（工作区修改，未提交）。
 
 ### Open Items
 
 1. **用户已接受 `CLOSED / CONDITIONAL PASS`（2026-10-18）**；非阻断事项保留。
-2. **Tag / push 未执行**：implementation commit `ef362fd` 已创建；tag / push 等待后续授权。
-3. **r6 → 冻结版差异未独立验证**：历史证据限制继续保留，未因本轮实施而改变。
-4. **U1 / U2** 仍为 OPEN（真实组织需求 / GUI 入口偏好），不属本阶段阻断项。
-5. **`--type` 未知值静默空结果**：按冻结决定仅记录，未改行为。
-6. **性能 benchmark**：Non-Goal，未做。
-7. **T-A2 未直接断言 `display_name` 最终写入值**：T-A1 已覆盖写服务生效，属非阻断。
-8. **`PROJECT_STATE.md` 中 Phase 3.3 历史段落漂移**：同节后续关闭记录已取代；属范围外历史文本。
-9. **`docs/ARCHITECTURE.md` 的 3.4 状态行仍为「实施完成，待用户验收」**：
-   本任务文件范围未包含该文件，需后续授权的文档-only 修正。
+2. **r6 → 冻结版差异未独立验证**：历史证据限制继续保留，未因本轮实施而改变。
+3. **U1 / U2** 仍为 OPEN（真实组织需求 / GUI 入口偏好），不属本阶段阻断项。
+4. **`--type` 未知值静默空结果**：按冻结决定仅记录，未改行为。
+5. **性能 benchmark**：Non-Goal，未做。
+6. **T-A2 未直接断言 `display_name` 最终写入值**：T-A1 已覆盖写服务生效，属非阻断。
+
+### Resolved After Closure
+
+- **Tag / push**：阶段关闭时未执行；2026-10-18 已创建 annotated tag `phase-3.4-closed`
+  并推送至 `origin`（见 Post-Closure Publication）。
+- **ARCHITECTURE 3.4 状态行**：已在后续文档一致性修复中同步（工作区修改，未提交）；
+  不再作为未解决事项。
+- **Phase 3.3 冻结段落状态漂移**：`PROJECT_STATE.md` 中“尚未实施 / 未关闭”的旧当前状态
+  描述已于 2026-10-18 的关闭后文档维护中改为“契约冻结时点的历史状态 + 后续关闭事实”，
+  不再作为未解决事项；不改变 Phase 3.3 的 `CLOSED / CONDITIONAL PASS` 结论或
+  `phase-3.3-closed` tag。
 
 ### Evidence
 
