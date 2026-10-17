@@ -2,13 +2,13 @@
 
 > **Koikatsu Sunshine 本地资源管理器** — 本地优先、默认只读、可人工修正。
 >
-> 当前状态：**Phase 3.3（Search & Query Foundation）已 CLOSED / CONDITIONAL PASS**
-> （tag `phase-3.3-closed`；验收结论为**有条件通过**，开放事项见
-> [docs/phase3/PHASE3_3_CLOSURE_REPORT.md](./docs/phase3/PHASE3_3_CLOSURE_REPORT.md)）
+> 当前状态：**Phase 3.4（User Classification & Search）实施完成，待用户验收**
+> （契约 FROZEN 2026-10-17；实施报告见
+> [docs/phase3/PHASE3_4_CLOSURE_REPORT.md](./docs/phase3/PHASE3_4_CLOSURE_REPORT.md)）
 > · 已封存：Phase 1 / Phase 2（`phase-2.4-closed`）/ Phase 3.0 · 3.0.2 · 3.1 · 3.2 · 3.3
-> · 下一步：Phase 3.4 及以后仍为**待规划方向（未冻结）**
-> · schema `v2` · Python 3.11+ · 测试基线 `938 passed`（Phase 3.3 实施轮实测，来源
-> [docs/phase3/PHASE3_3_LOG.md](./docs/phase3/PHASE3_3_LOG.md) §5.2）
+> · 下一步：Phase 3.4 用户验收；3.5 及以后仍为**待规划方向（未冻结）**
+> · schema `v2` · Python 3.11+ · 测试基线 `943 passed`（Phase 3.4 实施轮实测，来源
+> [docs/phase3/PHASE3_4_LOG.md](./docs/phase3/PHASE3_4_LOG.md) §5.2）
 >
 > 各阶段状态与权威文档入口以 [docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) 为准。
 
@@ -182,18 +182,20 @@ kks-resource-manager/
 | **0** | 架构与项目初始化（文档 + 骨架 + schema） | ✅ 已完成 |
 | 1 | 扫描 + KKS/KK 卡片识别 + SQLite + 只读 GUI 浏览器 | ✅ 已完成并收尾（PHASE 1 = CLOSED） |
 | 2 | MOD / 卡片解析 + Content Identity（sha256）+ Byte-duplicate（只读派生）+ 查询暴露 | ✅ 已完成并收尾（tag `phase-2.4-closed`） |
-| 3 | 用户数据 / 机器事实分离 + Tag 体系（Phase 3 首期） | 🚧 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；**3.3 已完成（CLOSED / CONDITIONAL PASS，tag `phase-3.3-closed`）**；3.4 及以后**待规划（未冻结）** |
+| 3 | 用户数据 / 机器事实分离 + Tag 体系（Phase 3 首期） | 🚧 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；**3.3 已完成（CLOSED / CONDITIONAL PASS，tag `phase-3.3-closed`）**；**3.4 实施完成，待用户验收（契约 FROZEN）**；3.5 及以后**待规划（未冻结）** |
 | 4 | 重复检测 + 资源关系 | ⏳ 早期路线图占位：byte-duplicate 已在 Phase 2 完成；其余未重新论证 |
 | 5 | 批量文件操作（Preview / Confirm / Undo） | ⏳ 早期路线图占位，未论证 |
 | 6 | 性能优化 + 测试 + Windows 打包 | ⏳ 早期路线图占位，未论证 |
 
 每完成一个 Phase 必须：跑测试 → 修错误 → 确认旧功能未被破坏 → 更新 README → 才进入下一阶段。
-Phase 3 的**路线图（整体）仍未冻结**：仅 Phase 3.3 有已冻结的 Contract（该契约已按其 §10.1
-完成实施，并经用户接受验收，结论为 **CONDITIONAL PASS**；有条件性质来自其 §18 登记的开放事项）——
-**冻结 ≠ 实施授权，也 ≠ 阶段完成**，更不代表整个 Phase 3 路线图已冻结。来源与权威级别见
-[docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) §4；Phase 3.3 的冻结记录见
+Phase 3 的**路线图（整体）仍未冻结**：Phase 3.3 与 Phase 3.4 均有已冻结的 Contract
+（3.3 已按其 §10.1 完成实施并经用户接受验收，结论为 **CONDITIONAL PASS**；3.4 已实施完成，
+待用户验收）——**冻结 ≠ 实施授权，也 ≠ 阶段完成**，更不代表整个 Phase 3 路线图已冻结。
+来源与权威级别见 [docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) §4；Phase 3.3 的冻结记录见
 [docs/phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./docs/phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md) §19；
-关闭记录见 [docs/phase3/PHASE3_3_CLOSURE_REPORT.md](./docs/phase3/PHASE3_3_CLOSURE_REPORT.md)。
+Phase 3.4 的冻结记录见
+[docs/phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md](./docs/phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md) §12，
+实施报告见 [docs/phase3/PHASE3_4_CLOSURE_REPORT.md](./docs/phase3/PHASE3_4_CLOSURE_REPORT.md)。
 
 ---
 

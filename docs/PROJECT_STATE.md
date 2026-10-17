@@ -27,6 +27,7 @@
 | schema | `SCHEMA_VERSION == 2` · 16 张业务表 · `MIGRATIONS == {1, 2}` | `core/database/schema.py` |
 | 测试基线 | `pytest -q` → **883 passed / 0 failed / 0 skipped**（两次独立运行：治理前只读基线复跑 52.2 s，2026-10-10；文档改动后复核 44.55 s，2026-10-10。两者不是同一次测试，且都不是 2026-10-11 的测量） | 分两次实测 |
 | 测试基线（Phase 3.3） | `pytest -q` → **938 passed / 0 failed / 0 skipped**（两次独立运行：`46.84 s` 与 `44.30 s`，**均为 2026-10-15 实施轮实测**）。**该结果未经后续收尾轮重新执行**，来源为实施日志 | `docs/phase3/PHASE3_3_LOG.md` §5.2 |
+| 测试基线（Phase 3.4） | `pytest -q` → **943 passed / 0 failed / 0 skipped**（2026-10-17 实施轮实测，`52.07 s`；`943 = 938 + 5` 新增用例） | `docs/phase3/PHASE3_4_LOG.md` §5.2 |
 | 持久工作库 | `data/kks_resource_manager.db`：`libraries=0` / `resources=0` / `mods=0` / `tags=0` / `resource_tags=0` / `collections=0` / `duplicate_groups=0`；`schema_version='2'` | 只读打开实测 |
 | 运行环境 | Python 3.11+（实测 3.12.10）· PyQt6 / msgpack / Pillow | `requirements.txt` |
 
@@ -117,16 +118,16 @@ Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplic
 | 3.1 | User Write Foundation | ✅ 已完成（CLOSED / PASS） |
 | 3.2 | Tag System | ✅ 已完成（CLOSED / PASS） |
 | 3.3 | Search & Query Foundation | ✅ 已完成（**CLOSED / CONDITIONAL PASS**，2026-10-15；tag `phase-3.3-closed`；Closure Report：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)） |
-| 3.4 | User Classification & Search | ⏳ **待规划方向**（未开始、未冻结） |
+| 3.4 | User Classification & Search | ✅ **实施完成，待用户验收**（契约 FROZEN，2026-10-17；Closure Report：[phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)） |
 | 3.5 | CLI / GUI Integration | ⏳ **待规划方向**（未开始、未冻结） |
 | 3.6 | （无定义） | ⚠️ **定义缺失**：仅出现在路线图记录中，全仓无任何内容定义；**不视为已批准阶段**，本文件不代为定义，也不删除该条目 |
 
 **来源与权威级别**：3.0.2 / 3.1 / 3.2–3.5 顺序来自
 `docs/phase3/PHASE3_0_2_SEARCH_TAXONOMY_ARCHITECTURE_REVIEW.md` §11 与该文件头部记录的
 「P3.0.1 路线图」，并由 `docs/phase3/PHASE3_2_LOG.md` §1 沿用。
-该来源属**审查级记录**（非 Contract、非冻结）；3.1 / 3.2 已是**事实**，3.3 已有**冻结契约**
-（其能力范围来自 `PHASE3_0_CONTRACT.md` §12-6 与用户批准的 Option B；见下方冻结记录），
-3.4 及以后仅为方向。
+该来源属**审查级记录**（非 Contract、非冻结）；3.1 / 3.2 已是**事实**，3.3 与 3.4 均已有**冻结契约**
+（3.3 的能力范围来自 `PHASE3_0_CONTRACT.md` §12-6 与用户批准的 Option B；3.4 见下方冻结与实施记录），
+3.5 及以后仅为方向。
 
 **Phase 3.3 冻结记录（事实）**：权威契约为
 [phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md)，
@@ -149,6 +150,14 @@ annotated tag `phase-3.3-closed` 指向该收尾提交；完成时核验 `HEAD =
 工作树 clean。收尾提交自身的 hash **不在本文件内嵌**（自引用），
 以 `git rev-parse phase-3.3-closed^{commit}` 与 Closure Report 为准。
 本阶段 §18 登记的证据缺口与 §2 Non-Goals 排除项在 §7 如实转记，**未关闭、未豁免**。
+
+**Phase 3.4 冻结与实施记录（事实，2026-10-17）**：权威契约为
+[phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md)，
+状态 **FROZEN**（2026-10-17，冻结提交 `632eb4c`，`docs(phase3.4): freeze implementation contract`）。
+G-2 实施已完成（零功能增量：仅核验 + 文档 + 测试），**无生产代码变更**；全量测试
+`943 passed`（来源 `PHASE3_4_LOG.md` §5.2）。实施报告见
+[phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)。
+**阶段尚未 CLOSED**（待用户验收）；G-3（commit / tag / push）未授权、未执行。
 
 **Phase 4 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 4–6 条目来自早期路线图，
 尚未重新论证（Phase 4 的 byte-duplicate 部分已在 Phase 2 以只读派生形式完成）。

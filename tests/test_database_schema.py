@@ -141,3 +141,48 @@ def test_fts_search_works_when_enabled(db_file: Path):
         assert len(short) == 1
     finally:
         conn.close()
+
+
+def test_fts_index_updates_display_name_on_write(db_file: Path):
+    """T-B：经 ResourceWriteService 更新 display_name 后，FTS 索引同步。"""
+    info = database.initialize(db_file)
+    if not info["fts_enabled"]:
+        pytest.skip("当前 SQLite 构建未启用 FTS5/trigram，已按设计回退 LIKE 搜索")
+
+    from core.app import ResourceWriteService
+
+    old = "ZZQTBOLDALPHA"
+    new = "ZZQTBNEWALPHA"
+    name = "ZZQTBNAMEALPHA"
+
+    conn = database.connect(db_file)
+    try:
+        conn.execute(
+            "INSERT INTO resources(file_path, file_path_key, resource_type, display_name, name)"
+            " VALUES ('D:/t_b.png', 'd:/t_b.png', 'character_card', ?, ?)",
+            (old, name),
+        )
+        row = conn.execute(
+            "SELECT id FROM resources WHERE file_path_key = 'd:/t_b.png'"
+        ).fetchone()
+        rid = int(row["id"])
+
+        def display_name_hits(term: str) -> list[int]:
+            return [
+                int(hit["rowid"])
+                for hit in conn.execute(
+                    "SELECT rowid FROM resources_fts"
+                    " WHERE resources_fts MATCH ?",
+                    (f'display_name : "{term}"',),
+                ).fetchall()
+            ]
+
+        assert display_name_hits(old) == [rid]
+        assert display_name_hits(new) == []
+
+        ResourceWriteService(conn).set_display_name(rid, new)
+
+        assert display_name_hits(new) == [rid]
+        assert display_name_hits(old) == []
+    finally:
+        conn.close()

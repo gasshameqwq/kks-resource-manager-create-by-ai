@@ -1,6 +1,6 @@
 # KKS Resource Manager — 架构文档
 
-> 版本：Phase 3.3 基线（Search & Query Foundation 已 CLOSED / CONDITIONAL PASS） · schema v2 · 2026-10-15
+> 版本：Phase 3.4 基线（User Classification & Search 实施完成，待用户验收） · schema v2 · 2026-10-17
 > 本文件只描述**当前有效**的架构；各阶段状态与权威文档入口见 `docs/PROJECT_STATE.md`。
 
 本文档描述系统的分层、数据模型与关键技术决策。Phase 0 交付了本文档、
@@ -55,8 +55,8 @@ Collection → 包含什么？
 标签 → 对应什么？
 ```
 
-**最关键的一条**：文件位置与分类完全分离。把资源加入 `Favorite` Collection
-或打上标签，**不移动文件、不改文件名**。数据库里的 `category / tag /
+**最关键的一条**：文件位置与分类完全分离。把资源加入 `Favorite`（保留系统
+Tag）或打上标签，**不移动文件、不改文件名**。数据库里的 `category / tag /
 collection` 与 `file_path` 是两套互不影响的维度。
 
 ---
@@ -82,6 +82,16 @@ kks-resource-manager/
 │   │   ├── models.py          # CharacterCardParseResult / ZipmodParseResult
 │   │   ├── card.py            # KKS/KK 卡片：PNG + msgpack 尾部
 │   │   └── zipmod.py          # ZIPMOD：manifest.xml → guid/name/author/version
+│   ├── query/                 # 只读 Query Layer（Phase 1.3–3.3 ✅）
+│   │   ├── model.py           # ResourceFilter：唯一 Query Model（15 筛选字段）
+│   │   ├── browse.py          # BrowserScope → ResourceFilter 映射 + 行模型
+│   │   ├── queries.py         # 唯一 SQL 执行点（ResourceQuery 等）
+│   │   ├── search.py          # FTS/LIKE 路由与输入转义
+│   │   └── tag_queries.py     # Tag / Favorite 只读事实
+│   ├── app/                   # 应用服务边界（Phase 3.1–3.2 ✅）
+│   │   ├── resource_write.py  # ResourceWriteService：唯一用户数据写入口
+│   │   ├── tag_write.py       # TagWriteService：唯一 Tag 写入口
+│   │   └── admin.py           # LibraryAdminService / run_scan
 │   ├── mod/                   # 空壳模块（MOD manifest / GUID 实际在 parsers/zipmod.py）
 │   ├── thumbnails/            # 缩略图缓存（只写 data/thumbnail_cache/）
 │   ├── duplicate/             # 空壳模块（byte-duplicate 为 Query 层只读派生）
@@ -200,6 +210,10 @@ Windows 路径不区分大小写，`D:/KKS/A.png` 与 `d:\kks\a.png` 是同一�
 `resources.type_source ∈ {auto, user}`。用户手动改过的类型，重扫时**不覆盖**。
 这是需求「自动识别 + 人工修正」在数据层的落点。
 
+`resource_type` 只有一列：用户修正直接写入该列并置 `type_source='user'`，
+Scanner 重扫时保留该值。因此该列即 **effective type**；Query 的
+`r.resource_type = ?` 过滤已反映用户修正，不存在保存「机器原类型」的第二列。
+
 ### 4.4 索引
 
 除主键/唯一约束外，为高频筛选建了索引：`resource_type`、`library_id`、
@@ -208,6 +222,10 @@ Windows 路径不区分大小写，`D:/KKS/A.png` 与 `d:\kks\a.png` 是同一�
 
 > 注：`quick_hash` / `content_key` 两列及其索引自 Phase 2.0-C §18.1 起定为
 > **deprecated / unused**（不写、不读、不删除），保留仅为兼容既有数据库。
+
+`resource_tags` 以 `(resource_id, tag_id)` 为主键，并有
+`idx_resource_tags_tag(tag_id)`；`tags.name_key` 唯一。这三者支撑
+Tag / Favorite 的双向只读筛选，无需新增索引。
 
 ---
 
@@ -272,7 +290,37 @@ FTS 表是**尽力启用**：若某台机器的 SQLite 构建不含 FTS5 或版�
 `initialize()` 会捕获异常、写入 `app_meta.fts_enabled=0` 并继续运行，
 搜索自动全程回退 LIKE。应用不会因此启动失败。
 
-### 5.4 写入事务
+检索面覆盖 `name` / `display_name`（FTS 与 LIKE 两条路径一致）、
+`relative_path`（恒 LIKE）以及作者关系（`resource_authors` + `authors`，恒 LIKE）。
+`name` 是机器事实，`display_name` 是用户覆盖值；两者任一命中即命中（OR），
+因此覆盖后旧 `name` 仍可被搜到。
+
+### 5.4 查询与筛选数据流（Query Model）
+
+所有结构化筛选与文本搜索都编译到同一个 Query Model，再由 Query Layer 的
+唯一执行点生成 SQL：
+
+```
+GUI FilterBar ──> BrowserScope ──┐
+                                 ├──> ResourceFilter ──> ResourceQuery（唯一 SQL 执行点） ──> SQLite
+CLI query resources ─────────────┘
+```
+
+- `BrowserScope`（`core/query/browse.py`）是 GUI 状态的唯一装配点；
+  `to_filter()` 将字段值映射为 `ResourceFilter`；`FILTER_KEYS` 为 14 个
+  GUI 可见筛选键（不含 `card_marker`），`filters()` 是该 14 键上的投影。
+- `ResourceFilter`（`core/query/model.py`）是不可变值对象，含 15 个筛选字段
+  （13 既有 + `tag_id` + `favorite`）；`to_params()` 恒返回 15 键；
+  不持有连接、不含 SQL、不做文本语法解析。
+- CLI `query resources` 的 `--tag` / `--favorite` / `--no-favorite`
+  与既有参数一起进入同一 `ResourceQuery` 路径；`--tag` 只按名称精确解析为
+  `tag_id`，不引入新的查询语法。
+- Tag 筛选：`resource_tags` 上的 `EXISTS`；Favorite：保留系统 Tag
+  （`FAVORITE_TAG_KEY`）上的 `EXISTS` / `NOT EXISTS`，**不是** Collection。
+- Query Layer 只读；`count` / `list` / 分页 / 排序共享同一筛选参数，
+  `BrowserScope.filters()` 同时供 `count` 与 `list` 使用。
+
+### 5.5 写入事务
 
 连接默认是 **autocommit**（`isolation_level=None`）：单条 DDL、单条 UI 编辑最省心。
 但 autocommit 下每一行都要单独落一次盘，数万行的批量导入会慢到不可接受。
@@ -377,7 +425,7 @@ FTS 存量回填只在**真正执行了迁移**时进行（`applied` 非空）�
 | **0** | 架构与项目初始化（本文档 + 骨架 + schema） | ✅ 完成 |
 | 1 | 扫描 + KKS/KK 卡片识别 + SQLite + 只读 GUI 浏览器 | ✅ 完成并收尾（PHASE 1 = CLOSED） |
 | 2 | MOD / 卡片解析 + Content Identity（sha256）+ Byte-duplicate 只读派生 + 查询暴露 | ✅ 完成并收尾（tag `phase-2.4-closed`） |
-| 3 | 用户数据 / 机器事实分离 + Tag 体系（Phase 3 首期） | 🚧 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；**3.3 已完成（CLOSED / CONDITIONAL PASS，tag `phase-3.3-closed`）**；3.4 及以后**未冻结** |
+| 3 | 用户数据 / 机器事实分离 + Tag 体系（Phase 3 首期） | 🚧 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；**3.3 已完成（CLOSED / CONDITIONAL PASS，tag `phase-3.3-closed`）**；**3.4 已完成实施，待用户验收（契约 FROZEN，2026-10-17）**；3.5 及以后**未冻结** |
 | 4 | 重复检测 + 资源关系 | ⏳ 早期路线图占位（byte-duplicate 已在 Phase 2 完成），未重新论证 |
 | 5 | 批量文件操作（Preview/Confirm/Undo） | ⏳ 早期路线图占位，未论证 |
 | 6 | 性能优化 + 测试 + Windows 打包 | ⏳ 早期路线图占位，未论证 |
@@ -386,6 +434,8 @@ FTS 存量回填只在**真正执行了迁移**时进行（`applied` 非空）�
 > 这**不**表示没有已冻结契约：**Phase 3.3 自身已有冻结 Contract**（FROZEN，2026-10-13），
 > 该契约已按其 §10.1 完成实施并由用户接受验收（**CONDITIONAL PASS**）；
 > 关闭记录见 `docs/phase3/PHASE3_3_CLOSURE_REPORT.md`。
+> Phase 3.4 同样已有冻结 Contract（FROZEN，2026-10-17，commit `632eb4c`）；
+> 实施完成、待用户验收，关闭记录尚未确认。
 > 当前工作方向与权威级别见 `docs/PROJECT_STATE.md` §4。
 
 Phase 1 拆成 4 个可独立验收的小步（一次只做一步，做完即验收）：

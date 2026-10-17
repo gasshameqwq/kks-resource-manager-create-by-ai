@@ -620,3 +620,21 @@ def test_new_scope_fields_are_appended_with_defaults():
         "order_by",
         "descending",
     }
+
+
+def test_user_type_override_filters_by_effective_type(conn):
+    """T-C：用户类型修正后，按有效类型筛选命中，ownership marker 为 user。"""
+    from core.app import ResourceWriteService
+
+    rid = _add_resource(conn, 61)
+    rq = ResourceQuery(conn)
+
+    assert [row.id for row in rq.list(resource_type="character_card")] == [rid]
+
+    ResourceWriteService(conn).set_resource_type(rid, "mod")
+
+    assert [row.id for row in rq.list(resource_type="mod")] == [rid]
+    assert rq.list(resource_type="character_card") == []
+    summary = rq.summary(rid)
+    assert summary is not None
+    assert summary.type_source == "user"

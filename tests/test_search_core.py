@@ -941,3 +941,73 @@ def test_real_sample_search_is_read_only(real_db) -> None:
         ).fetchone()["c"]
         == 0
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.4 — T-A1 / T-A2：display_name 覆盖后的文本搜索
+# ---------------------------------------------------------------------------
+
+
+def test_display_name_override_searchable_via_fts(db, monkeypatch) -> None:
+    """T-A1：覆盖后的 display_name 可经 FTS 路径命中。"""
+    conn, fts_enabled = db
+    if not fts_enabled:
+        pytest.skip("当前 SQLite 构建未启用 FTS5/trigram")
+
+    import core.query.queries as queries_mod
+    from core.app import ResourceWriteService
+
+    rid = 901
+    _add_resource(conn, rid, name="ZZQTA1FTSNAME", display_name="ZZQTA1OLD")
+    ResourceWriteService(conn).set_display_name(rid, "ZZQTA1NEWALIAS")
+
+    seen: list[str] = []
+    real = queries_mod.fts_match_expression
+    monkeypatch.setattr(
+        queries_mod,
+        "fts_match_expression",
+        lambda text: (seen.append(text), real(text))[1],
+    )
+
+    rows = ResourceQuery(conn).list(query="ZZQTA1NEWALIAS")
+    assert [row.id for row in rows] == [rid]
+    assert seen == ["ZZQTA1NEWALIAS"]
+
+
+def test_display_name_override_searchable_via_like_fallback(db, monkeypatch) -> None:
+    """T-A1：强制关闭 FTS 后，覆盖后的 display_name 仍可经 LIKE 命中。"""
+    conn, _ = db
+
+    import core.query.queries as queries_mod
+    from core.app import ResourceWriteService
+
+    rid = 902
+    _add_resource(conn, rid, name="ZZQTA1LIKENAME", display_name="ZZQTA1LIKEOLD")
+    ResourceWriteService(conn).set_display_name(rid, "ZZQTA1LIKENEW")
+
+    conn.execute("UPDATE app_meta SET value = '0' WHERE key = 'fts_enabled'")
+
+    seen: list[str] = []
+    real = queries_mod.fts_match_expression
+    monkeypatch.setattr(
+        queries_mod,
+        "fts_match_expression",
+        lambda text: (seen.append(text), real(text))[1],
+    )
+
+    rows = ResourceQuery(conn).list(query="ZZQTA1LIKENEW")
+    assert [row.id for row in rows] == [rid]
+    assert seen == []
+
+
+def test_old_name_still_matches_after_display_name_override(db) -> None:
+    """T-A2：覆盖 display_name 后，旧 name 仍按现行 name OR display_name 语义命中。"""
+    conn, _ = db
+    from core.app import ResourceWriteService
+
+    rid = 903
+    _add_resource(conn, rid, name="ZZQTA2OLDNAME", display_name="ZZQTA2OLD")
+    ResourceWriteService(conn).set_display_name(rid, "ZZQTA2NEW")
+
+    rows = ResourceQuery(conn).list(query="ZZQTA2OLDNAME")
+    assert [row.id for row in rows] == [rid]
