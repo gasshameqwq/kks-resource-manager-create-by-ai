@@ -99,6 +99,7 @@
 | Phase 3.1 | CLOSED / PASS（User Write Foundation） | [phase3/PHASE3_1_CLOSURE_REPORT.md](./phase3/PHASE3_1_CLOSURE_REPORT.md) | `phase-3.1-closed` |
 | Phase 3.2 | CLOSED / PASS（Tag System） | [phase3/PHASE3_2_CLOSURE_REPORT.md](./phase3/PHASE3_2_CLOSURE_REPORT.md) | `phase-3.2-closed` |
 | Phase 3.3 | **CLOSED / CONDITIONAL PASS**（Search & Query Foundation） | [phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md) | `phase-3.3-closed` |
+| Phase 3.4 | **CLOSED / CONDITIONAL PASS**（User Classification & Search） | [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md) | —（tag 未创建） |
 
 Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplicate / 2.3 查询暴露 /
 2.4 收尾审计）见 `docs/phase2/` 下的各阶段报告；Phase 1 内部划分见 `docs/phase1/`。
@@ -118,7 +119,7 @@ Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplic
 | 3.1 | User Write Foundation | ✅ 已完成（CLOSED / PASS） |
 | 3.2 | Tag System | ✅ 已完成（CLOSED / PASS） |
 | 3.3 | Search & Query Foundation | ✅ 已完成（**CLOSED / CONDITIONAL PASS**，2026-10-15；tag `phase-3.3-closed`；Closure Report：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)） |
-| 3.4 | User Classification & Search | ✅ **实施完成，待用户验收**（契约 FROZEN，2026-10-17；Closure Report：[phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)） |
+| 3.4 | User Classification & Search | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-18；契约 FROZEN；Closure Report：[phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)） |
 | 3.5 | CLI / GUI Integration | ⏳ **待规划方向**（未开始、未冻结） |
 | 3.6 | （无定义） | ⚠️ **定义缺失**：仅出现在路线图记录中，全仓无任何内容定义；**不视为已批准阶段**，本文件不代为定义，也不删除该条目 |
 
@@ -151,17 +152,20 @@ annotated tag `phase-3.3-closed` 指向该收尾提交；完成时核验 `HEAD =
 以 `git rev-parse phase-3.3-closed^{commit}` 与 Closure Report 为准。
 本阶段 §18 登记的证据缺口与 §2 Non-Goals 排除项在 §7 如实转记，**未关闭、未豁免**。
 
-**Phase 3.4 冻结与实施记录（事实，2026-10-17）**：权威契约为
+**Phase 3.4 冻结、实施与关闭记录（事实，2026-10-18）**：权威契约为
 [phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md)，
 状态 **FROZEN**（2026-10-17，冻结提交 `632eb4c`，`docs(phase3.4): freeze implementation contract`）。
 G-2 实施已完成（零功能增量：仅核验 + 文档 + 测试），**无生产代码变更**；全量测试
 `943 passed`（实施轮 52.07 s；G-3 提交前复跑 43.07 s，来源 `PHASE3_4_LOG.md` §5.2 / §9）。
 Implementation commit：`ef362fd19e79a67dd496ef5751393244844131a2`
 （`test(phase3.4): verify display name and effective type behavior`，8 files，+459/−21）。
+文档状态修正 commit：`9e694cf1573ba744ec26f896fe36413a6ac483ff`
+（`docs(phase3.4): correct finalization status`，3 files，+54/−6）。
 G-3 的提交前核验、focused/全量测试、implementation commit 与提交后核验已完成；
-**Phase 3.4 tag 尚未创建，push 尚未执行**。实施报告见
+**Phase 3.4 tag 尚未创建，push 尚未执行**。实施/关闭报告见
 [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)。
-**阶段尚未 CLOSED**（待最终收尾与阶段关闭验收）。
+**阶段已于 2026-10-18 CLOSED / CONDITIONAL PASS**；非阻断事项（T-A2 断言独立性、
+3.3 历史段落漂移、r6→冻结差异未独立验证、ARCHITECTURE 3.4 状态行）见 Closure Report。
 
 **Phase 4 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 4–6 条目来自早期路线图，
 尚未重新论证（Phase 4 的 byte-duplicate 部分已在 Phase 2 以只读派生形式完成）。

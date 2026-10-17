@@ -177,6 +177,9 @@ CURRENT_TABLES 16
   父提交 `632eb4c7dcaa593208c2a52911273896cbb2cef7`；
   message `test(phase3.4): verify display name and effective type behavior`；
   8 files changed，459 insertions(+)，21 deletions(-)。
+- 文档状态修正 commit：`9e694cf1573ba744ec26f896fe36413a6ac483ff`
+  （`docs(phase3.4): correct finalization status`，3 files，+54/−6）。
+- 最终关闭提交：即本报告所在提交（自引用，不内嵌自身 hash）。
 - 提交后 `git status --short` 为空；冻结契约 blob 未变。
 - Phase 3.4 tag：**未创建**；push：**未执行**。
-- 阶段状态：**IMPLEMENTATION COMPLETE / PENDING USER ACCEPTANCE**（未 CLOSED）。
+- 阶段状态：**CLOSED / CONDITIONAL PASS**（2026-10-18）；非阻断事项见 Closure Report。

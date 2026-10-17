@@ -1,10 +1,10 @@
 # Phase 3.4 — User Classification & Search
 
-## Implementation Closure Report
+## Final Closure Report
 
-> 文档类型：Phase 3.4 **实施完成报告**（不是最终 CLOSED 结论）
-> 日期：2026-10-17
-> 状态：**IMPLEMENTATION COMPLETE / PENDING USER ACCEPTANCE**
+> 文档类型：Phase 3.4 **最终关闭报告（Closure Report）**
+> 日期：2026-10-18
+> 状态：**CLOSED / CONDITIONAL PASS**
 
 ---
 
@@ -15,17 +15,21 @@ Phase 3.4 — User Classification & Search
 ### Status
 
 ```text
-IMPLEMENTATION COMPLETE / PENDING USER ACCEPTANCE
+CLOSED / CONDITIONAL PASS
 ```
 
-**不是 CLOSED，也不是 PASS。** 本报告只记录实施完成与 DoD 证据；最终验收与 G-3
-Git 收尾仍由用户决定。
+**有条件通过的来源**：核心实施与测试已完成，但仍有已记录的非阻断事项与历史证据限制
+（见 Open Items）；它们未被解决、未被豁免、未被标记为已验证。
+Phase 3.4 tag 尚未创建，push 尚未执行。
 
 ### Contract
 
 - 权威实施契约：`docs/phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md`（**FROZEN**，2026-10-17，冻结提交 `632eb4c`）。
 - 契约 blob 未修改：`b7b4ab7bb311c280b95472b2fa55950cab29aace` == `HEAD:`。
 - 前置：Phase 3.3 = CLOSED / CONDITIONAL PASS（tag `phase-3.3-closed`）。
+- Implementation commit：`ef362fd19e79a67dd496ef5751393244844131a2`。
+- 文档状态修正 commit：`9e694cf1573ba744ec26f896fe36413a6ac483ff`。
+- 最终关闭提交：即本报告所在提交（自引用，不内嵌自身 hash）。
 
 ### Implementation
 
@@ -44,6 +48,7 @@ Git 收尾仍由用户决定。
 | :--- | :--- |
 | focused（5 个新用例） | `5 passed, 134 deselected in 1.31s` |
 | 全量 `pytest -q` | `943 passed in 52.07s` |
+| G-3 提交前复跑 | focused `5 passed`（0.19s，exit 0）；full `943 passed`（43.07s，exit 0） |
 | 只读护栏 | `8 passed, 149 deselected in 2.04s` |
 | schema | `SCHEMA_VERSION == 2` / `MIGRATIONS == {1, 2}` / 16 表 |
 | 生产代码 diff | 空 |
@@ -57,6 +62,8 @@ Git 收尾仍由用户决定。
 | 父提交 | `632eb4c7dcaa593208c2a52911273896cbb2cef7` |
 | Message | `test(phase3.4): verify display name and effective type behavior` |
 | 文件 / 统计 | 8 files changed, 459 insertions(+), 21 deletions(-) |
+| 文档修正 commit | `9e694cf1573ba744ec26f896fe36413a6ac483ff`（3 files，+54/−6） |
+| 最终关闭提交 | 本报告所在提交（自引用，不内嵌） |
 | Phase 3.4 tag | **未创建** |
 | Push | **未执行** |
 
@@ -78,19 +85,21 @@ Git 收尾仍由用户决定。
 | 12 | 无生产代码变更时显式声明 | ✅ 见上 |
 | 13 | 零增量不豁免验证 | ✅ 全量测试已跑 |
 | 14 | Step 0 按 §6.1 记录 | ✅ LOG §2 |
-| 15 | 阶段未自动关闭 | ✅ 待用户验收 |
+| 15 | 阶段未自动关闭 | ✅ 用户已接受 `CLOSED / CONDITIONAL PASS`（2026-10-18） |
 
 ### Scope
 
 - 本阶段只做核验 + 文档 + 测试；未修改 `core/**`、`cli_query.py`、`main.py`、`ui/**`、schema、迁移或 DTO。
 - 未改变 `display_name` 搜索语义；未给 `--type` 增加校验；Resource Taxonomy 继续暂缓。
-- G-3 的提交前核验、focused/全量测试、implementation commit `ef362fd` 与提交后核验已完成；
-  **Phase 3.4 tag 尚未创建，push 尚未执行**。
-- 状态行已同步为「实施完成，待用户验收」，**不是**「CLOSED」。
+- G-3 的提交前核验、focused/全量测试、implementation commit `ef362fd`、文档修正 commit
+  `9e694cf` 与提交后核验已完成；**Phase 3.4 tag 尚未创建，push 尚未执行**。
+- `PROJECT_STATE.md` / `README.md` / 本报告 / `PHASE3_4_LOG.md` 已同步为
+  `CLOSED / CONDITIONAL PASS`；`docs/ARCHITECTURE.md` 的 3.4 状态行仍为
+  「实施完成，待用户验收」，本任务未授权修改，登记为非阻断后续项。
 
 ### Open Items
 
-1. **用户验收尚未作出**：阶段未 CLOSED。
+1. **用户已接受 `CLOSED / CONDITIONAL PASS`（2026-10-18）**；非阻断事项保留。
 2. **Tag / push 未执行**：implementation commit `ef362fd` 已创建；tag / push 等待后续授权。
 3. **r6 → 冻结版差异未独立验证**：历史证据限制继续保留，未因本轮实施而改变。
 4. **U1 / U2** 仍为 OPEN（真实组织需求 / GUI 入口偏好），不属本阶段阻断项。
@@ -98,9 +107,13 @@ Git 收尾仍由用户决定。
 6. **性能 benchmark**：Non-Goal，未做。
 7. **T-A2 未直接断言 `display_name` 最终写入值**：T-A1 已覆盖写服务生效，属非阻断。
 8. **`PROJECT_STATE.md` 中 Phase 3.3 历史段落漂移**：同节后续关闭记录已取代；属范围外历史文本。
+9. **`docs/ARCHITECTURE.md` 的 3.4 状态行仍为「实施完成，待用户验收」**：
+   本任务文件范围未包含该文件，需后续授权的文档-only 修正。
 
 ### Evidence
 
 - 实施日志：`docs/phase3/PHASE3_4_LOG.md`
 - 测试：`tests/test_search_core.py`、`tests/test_database_schema.py`、`tests/test_query_model.py`
 - 架构：`docs/ARCHITECTURE.md`
+- Commit 证据：`ef362fd19e79a67dd496ef5751393244844131a2`（implementation）、
+  `9e694cf1573ba744ec26f896fe36413a6ac483ff`（文档修正）。
