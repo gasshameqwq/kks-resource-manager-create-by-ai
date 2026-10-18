@@ -159,14 +159,14 @@ annotated tag `phase-3.3-closed` 指向该收尾提交；完成时核验 `HEAD =
 状态 **FROZEN**（2026-10-17，冻结提交 `632eb4c`，`docs(phase3.4): freeze implementation contract`）。
 G-2 实施已完成（零功能增量：仅核验 + 文档 + 测试），**无生产代码变更**；全量测试
 `943 passed`（实施轮 52.07 s；G-3 提交前复跑 43.07 s，来源 `PHASE3_4_LOG.md` §5.2 / §9）。
-Implementation commit：`ef362fd19e79a67dd496ef5751393244844131a2`
+Implementation commit：`efffae65c2d66256b5522704a77f50cf38917687`
 （`test(phase3.4): verify display name and effective type behavior`，8 files，+459/−21）。
-文档状态修正 commit：`9e694cf1573ba744ec26f896fe36413a6ac483ff`
+文档状态修正 commit：`0c1ea2ceff2a2c9e01470ad4a4ecdd592ee113e5`
 （`docs(phase3.4): correct finalization status`，3 files，+54/−6）。
 G-3 的提交前核验、focused/全量测试、implementation commit、文档修正 commit 与提交后核验已完成；
 **Phase 3.4 tag `phase-3.4-closed`（annotated，tag object
-`0cae547c7c21cc1a754b147726f022a3396d38c3`，peeled
-`6553333f832de03468af7945294002ba37d040ef`）已创建并推送至 `origin`**
+`294336feeac2a9813f21d11a8a147fa522c71fd5`，peeled
+`11d2a1498ab63d3b3518e6723337185a5321c347`）已创建并推送至 `origin`**
 （`https://github.com/gasshameqwq/kks-resource-manager-create-by-ai.git`）。实施/关闭报告见
 [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)。
 **阶段已于 2026-10-18 CLOSED / CONDITIONAL PASS**；非阻断事项（T-A2 断言独立性、
