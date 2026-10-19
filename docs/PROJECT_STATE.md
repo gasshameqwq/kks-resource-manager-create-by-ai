@@ -1,8 +1,8 @@
 # PROJECT_STATE — 项目当前状态与权威文档入口
 
 > 文档类型：**当前状态登记（CURRENT STATE）**。不是冻结契约，不是阶段报告。
-> 最后更新：2026-10-18（修正 Phase 3.3 冻结段落中已过时的当前状态描述；
-> 将该项转记为后续文档维护已处理，不改变历史事件日期或阶段结论）
+> 最后更新：2026-10-19（将 Phase H2 关闭成果迁移到已清洗的远端历史；保留
+> 2026-10-18 的 Conditional PASS 结论和未解决证据限制）
 >
 > 维护规则：
 > - 本文件只描述**当前**状态；历史结论仍以对应阶段报告为准，**不以本文件改写历史**。
@@ -13,16 +13,18 @@
 
 ## 1. 基线快照
 
-**时点与语义说明**：本表记录的是**上一次核验时点**的基线，**不会随每次提交自动更新**。
-其中「HEAD（本次核验的仓库起点）」记录的是**本次文档修订提交之前**核验到的 HEAD ——
-提交本次修订后，它**预期不再等于当前 HEAD**，这属正常情况，不代表本文件失效、也不需要立即改写。
-需要"当前 HEAD"时应现场执行 `git rev-parse HEAD`，不要直接引用本表。
+**时点与语义说明**：本表保留历史核验时点，并单独登记旧本地历史与已清洗远端
+`main`；这些值属于不同对象，不能互相替代。需要“当前 HEAD”时应现场执行
+`git rev-parse HEAD`，不要直接引用历史行。
 
 | 项 | 值 | 证据 |
 | :--- | :--- | :--- |
-| HEAD（本次核验的仓库起点；**本次文档修订提交之前**） | `950645c`（feat(phase3.3): add query model and read-only tag filtering，Phase 3.3 实施提交） | `git rev-parse HEAD`（2026-10-15 核验） |
-| 阶段关闭 tag（独立记录，与上行 HEAD 无对应关系） | `phase-3.3-closed` → 收尾提交（**即本文件所在提交**；收尾提交 hash 见 `git rev-parse phase-3.3-closed^{commit}`，不在本表内嵌以避免自引用） | `git rev-parse phase-3.3-closed^{commit}` |
-| 历史 tag | `phase-2.0-closed` … `phase-2.4-closed`（`phase-2.4-closed` → `202c285`）· `phase-3.0-closed` → `c2fd527` · `phase-3.1-closed` → `99aa0d1` · `phase-3.2-closed` → `034a726` | `git tag -l` |
+| 历史核验基线（**旧本地 Phase 3.3 收尾文档修订前**；非当前 HEAD） | `950645c`（feat(phase3.3): add query model and read-only tag filtering，Phase 3.3 实施提交） | 旧本地历史记录（2026-10-15） |
+| 旧本地 `main` HEAD（H2 关闭文档提交；**不是**远端清洗后历史） | `880f26a86d91015192a3ce3085e187711d4772f8` | `git rev-parse main`（2026-10-19 核验） |
+| 已清洗远端 `main`（H2 发布基线） | `ca694778a21e01a849c735342a589397f101cc75` | `git rev-parse origin/main`；A4/A5 证据 |
+| H2 文档迁移工作分支基线 | `ca694778a21e01a849c735342a589397f101cc75`（`origin/main`） | 本文件迁移时现场核验 |
+| 阶段关闭 tag（**旧本地 H2 前历史记录**） | `phase-3.3-closed` → 旧本地收尾提交；具体 tag object / peeled 对照见 §3.1 | 旧本地 tag refs（不与远端同名 tag 混用） |
+| 历史 tags（**旧本地历史基线记录；不是远端完整权威清单**） | `phase-2.0-closed` … `phase-2.4-closed`（`phase-2.4-closed` → `202c285`）· `phase-3.0-closed` → `c2fd527` · `phase-3.1-closed` → `99aa0d1` · `phase-3.2-closed` → `034a726` | 旧本地 `git tag -l`；远端同名 tags 见 §3.1 |
 | schema | `SCHEMA_VERSION == 2` · 16 张业务表 · `MIGRATIONS == {1, 2}` | `core/database/schema.py` |
 | 测试基线 | `pytest -q` → **883 passed / 0 failed / 0 skipped**（两次独立运行：治理前只读基线复跑 52.2 s，2026-10-10；文档改动后复核 44.55 s，2026-10-10。两者不是同一次测试，且都不是 2026-10-11 的测量） | 分两次实测 |
 | 测试基线（Phase 3.3） | `pytest -q` → **938 passed / 0 failed / 0 skipped**（两次独立运行：`46.84 s` 与 `44.30 s`，**均为 2026-10-15 实施轮实测**）。**该结果未经后续收尾轮重新执行**，来源为实施日志 | `docs/phase3/PHASE3_3_LOG.md` §5.2 |
@@ -99,9 +101,25 @@
 | Phase 3.2 | CLOSED / PASS（Tag System） | [phase3/PHASE3_2_CLOSURE_REPORT.md](./phase3/PHASE3_2_CLOSURE_REPORT.md) | `phase-3.2-closed` |
 | Phase 3.3 | **CLOSED / CONDITIONAL PASS**（Search & Query Foundation） | [phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md) | `phase-3.3-closed` |
 | Phase 3.4 | **CLOSED / CONDITIONAL PASS**（User Classification & Search） | [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md) | `phase-3.4-closed` |
+| Phase H2 | **CLOSED / CONDITIONAL PASS**（Git History Privacy Remediation） | [PHASE_H2_CLOSURE_REPORT.md](./PHASE_H2_CLOSURE_REPORT.md) | —（H2 未创建专用 tag） |
 
 Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplicate / 2.3 查询暴露 /
 2.4 收尾审计）见 `docs/phase2/` 下的各阶段报告；Phase 1 内部划分见 `docs/phase1/`。
+
+### 3.1 Phase H2 — Git History Privacy Remediation
+
+**CLOSED / CONDITIONAL PASS**（用户批准，2026-10-18）。H2 处理 Phase 1 至
+Phase 3.4 完整历史的隐私整改、候选验证与现有 GitHub 仓库发布，不是 Phase 3.5
+功能开发。
+
+- 已清洗远端 `main`：`ca694778a21e01a849c735342a589397f101cc75`。
+- 远端保留 10 个阶段 tags；名称、类型、对象和 peeled 关系以 A4/A5 证据为准。
+- 旧本地 `main` 和同名 tags 仍属于 H2 前的分离历史，不得把其 commit/tag object
+  当作远端清洗后对象，也不得将旧本地谱系合并或强制推送到远端。
+- 当前文档迁移分支以 `origin/main` 的 `ca694778...` 为基线，仅准备 H2 关闭
+  报告与本次状态同步；在完成审核和另行授权前不创建 commit、不 push、不修改 tag。
+- 关闭结论保持 **CONDITIONAL PASS**；五项未解决限制见 §7 和
+  [PHASE_H2_CLOSURE_REPORT.md](./PHASE_H2_CLOSURE_REPORT.md)。
 
 ---
 
@@ -230,6 +248,20 @@ U1 / U3 / U4 / U5 **均无真实使用证据**；U2 仅有实现进度（Phase 3
 上游 `PHASE3_0_CONTRACT.md` §14.3 的 U4 / U5 属**上游登记项**，不属 Phase 3.3 范围（其关联能力已被
 Phase 3.3 契约 §2-10 排除），**不得**扩展为本阶段的实施内容或验收条件。
 
+**Phase H2 关闭时保留的证据限制（2026-10-18，仍未解决）**：
+
+1. A5 缺少 `fsck.log` 与 `fsck-unreachable.log` 原始输出；summary 中的退出码 0
+   不能替代原始日志，该部分无法由独立审核直接复核。
+2. A4 `push.log` 与 `prepush-dry-run.log` 的 SHA-256 相同
+   （`2BA4313A8087177AEC805E86B5859CA8E6885B56FD0D5405FAA61DC55645AEEC`），
+   降低了独立证明力；push 退出状态与推送后 refs 核验不能消除该缺陷。
+3. 公开 refs 和 fresh clone 已核验，但不能证明 GitHub 服务端所有缓存、不可达
+   对象、PR refs、fork 及协作者本地副本均已清除。
+4. 没有清理任何备份、旧对象、staging/演练目录或测试临时文件；不得声称已完成
+   历史材料清理。
+5. 独立审核没有重新运行项目测试；A2 测试记录及候选内容与 A2 测试 tree 的
+   一致性是既有依据，不得表述为独立复测通过。
+
 ---
 
 ## 8. 已知代码内过期字符串（登记，本次不处理）
@@ -251,6 +283,7 @@ Phase 3.3 契约 §2-10 排除），**不得**扩展为本阶段的实施内容�
 - Phase 3 首期冻结 Contract：[phase3/PHASE3_0_CONTRACT.md](./phase3/PHASE3_0_CONTRACT.md)
 - Phase 3.3 冻结 Contract（FROZEN，2026-10-13）：[phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md)
 - Phase 3.3 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-15）：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)
+- Phase H2 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-18）：[PHASE_H2_CLOSURE_REPORT.md](./PHASE_H2_CLOSURE_REPORT.md)
 - Phase 3.3 实施日志（含证据修订说明）：[phase3/PHASE3_3_LOG.md](./phase3/PHASE3_3_LOG.md)
 - Phase 3.2 实施日志（含最终状态索引）：[phase3/PHASE3_2_LOG.md](./phase3/PHASE3_2_LOG.md)
 - 证据缺口登记：[phase3/PHASE3_0_OPEN_EVIDENCE.md](./phase3/PHASE3_0_OPEN_EVIDENCE.md)
