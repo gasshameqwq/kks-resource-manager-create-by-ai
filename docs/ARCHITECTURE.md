@@ -434,9 +434,12 @@ FTS 存量回填只在**真正执行了迁移**时进行（`applied` 非空）�
 > 这**不**表示没有已冻结契约：**Phase 3.3 自身已有冻结 Contract**（FROZEN，2026-10-13），
 > 该契约已按其 §10.1 完成实施并由用户接受验收（**CONDITIONAL PASS**）；
 > 关闭记录见 `docs/phase3/PHASE3_3_CLOSURE_REPORT.md`。
-> Phase 3.4 同样已有冻结 Contract（FROZEN，2026-10-17，commit `632eb4c`）；
-> 阶段已 CLOSED / CONDITIONAL PASS（closure commit `6553333`，annotated tag
-> `phase-3.4-closed` 已推送）；非阻断事项见 Closure Report，未解决。
+> Phase 3.4 已有冻结 Contract（FROZEN，2026-10-17）：H2 前冻结提交为 `632eb4c`，
+> 清洗后当前谱系中的对应提交为 `7704a98`。阶段已 CLOSED / CONDITIONAL PASS：
+> H2 前关闭提交为 `6553333`，清洗后对应提交为 `11d2a14`；当前远端 annotated tag
+> `phase-3.4-closed` 的 object 为 `294336f`、peeled commit 为 `11d2a14`，本地 tag
+> 仍保留 H2 前的 `0cae547` → `6553333`。对应证据强度与限制见
+> `PROJECT_STATE.md` §3.2；非阻断事项见 Closure Report，仍未解决。
 > 当前工作方向与权威级别见 `docs/PROJECT_STATE.md` §4。
 
 Phase 1 拆成 4 个可独立验收的小步（一次只做一步，做完即验收）：

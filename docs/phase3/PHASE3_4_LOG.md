@@ -1,7 +1,8 @@
 # Phase 3.4 — Implementation Log（User Classification & Search）
 
 > 文档类型：**Implementation Log**（过程与实测记录；不构成契约，不替代验收结论）
-> 依据：`docs/phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md`（**FROZEN**，2026-10-17，冻结提交 `632eb4c`）
+> 依据：`docs/phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md`（**FROZEN**，2026-10-17，
+> H2 前冻结提交 `632eb4c`；清洗后对应提交 `7704a98`）
 > 日期：2026-10-17
 > 范围：IS1 / IS2 / IS4 / IS5；IS6 收尾与 G-3 提交记录见 §9 与 Closure Report。
 
@@ -11,9 +12,9 @@
 
 | 项 | 值 |
 | :--- | :--- |
-| 分支 | `main` |
-| HEAD | `632eb4c7dcaa593208c2a52911273896cbb2cef7` |
-| 工作区（实施前） | clean |
+| 分支（H2 前实施基线） | `main` |
+| HEAD（H2 前实施基线） | `632eb4c7dcaa593208c2a52911273896cbb2cef7` |
+| 工作区（实施前，H2 前历史记录） | clean |
 | 冻结契约 | `FROZEN`（r6 · FROZEN） |
 | schema | `SCHEMA_VERSION == 2` / `MIGRATIONS == {1, 2}` / 16 张业务表 |
 | 历史测试基线 | `938 passed`（Phase 3.3 日志；**非本轮结果**） |
@@ -168,7 +169,7 @@ CURRENT_TABLES 16
 
 ---
 
-## 9. G-3 执行记录（事实，2026-10-17）
+## 9. G-3 执行记录（H2 前历史记录，2026-10-17）
 
 - 执行前 HEAD：`632eb4c7dcaa593208c2a52911273896cbb2cef7`；工作区 clean；
   冻结契约 blob `b7b4ab7bb311c280b95472b2fa55950cab29aace` 未变。
@@ -187,13 +188,43 @@ CURRENT_TABLES 16
 
 ---
 
-## 10. Post-Closure Publication（事实，2026-10-18）
+## 10. Post-Closure Publication（H2 前发布记录，2026-10-18）
 
 阶段关闭后完成的 tag/push 操作，不改变 `CLOSED / CONDITIONAL PASS` 结论：
+
+> 本节保留 H2 前的已执行记录，不替换其中任何 commit/tag 值。H2 之后远端同名
+> tag 已重写；当前远端 refs 的对照见 §11 和 Closure Report 的 H2 小节。
 
 - Tag：`phase-3.4-closed`（annotated）
 - Tag object：`0cae547c7c21cc1a754b147726f022a3396d38c3`
 - Peeled commit：`6553333f832de03468af7945294002ba37d040ef`
 - Remote：`origin` → `https://github.com/gasshameqwq/kks-resource-manager-create-by-ai.git`
 - Push：已完成（仅推送 `refs/tags/phase-3.4-closed`）
-- Remote verification：`git ls-remote` 返回相同 tag object 与 peeled commit
+- Remote verification（H2 前，2026-10-18）：当时 `git ls-remote` 返回相同 tag
+  object 与 peeled commit
+
+---
+
+## 11. H2 清洗前后对象对照（2026-10-21）
+
+本节补充 H2 重写后的对应关系，**不改写 §1、§9、§10 的历史值**：
+
+| 节点 | H2 前对象（保留） | 清洗后对象（当前谱系） |
+| :--- | :--- | :--- |
+| Contract 冻结 | `632eb4c7dcaa593208c2a52911273896cbb2cef7` | `7704a98a4569f8148494a0618bb11019ef1e1189` |
+| Implementation | `ef362fd19e79a67dd496ef5751393244844131a2` | `efffae65c2d66256b5522704a77f50cf38917687` |
+| 文档状态修正 | `9e694cf1573ba744ec26f896fe36413a6ac483ff` | `0c1ea2ceff2a2c9e01470ad4a4ecdd592ee113e5` |
+| 正式关闭 | `6553333f832de03468af7945294002ba37d040ef` | `11d2a1498ab63d3b3518e6723337185a5321c347` |
+| 关闭后状态协调 | `442a980a994614623405ecf3243f90e461991ea0` | `198908c299472672be6ed5590c9a3ddfaeca234a` |
+| tag object | `0cae547c7c21cc1a754b147726f022a3396d38c3` | 远端 `294336feeac2a9813f21d11a8a147fa522c71fd5` |
+| tag peeled commit | `6553333f832de03468af7945294002ba37d040ef` | 远端 `11d2a1498ab63d3b3518e6723337185a5321c347` |
+
+**证据强度**：五组提交的提交说明、作者时间和父链位置对应，且
+`git patch-id --stable` 完全相同；远端 tag object 与 peeled target 已由 2026-10-21
+只读 `git ls-remote` 核验。完整 patch-id 与限制以
+`docs/PROJECT_STATE.md` §3.2 为准。
+
+**限制**：仓库内没有 H2 正式发布的完整映射表，A4/A5 原始证据本次未直接复核；
+patch-id 相同支持差异等价，但不等于证明整棵树在所有历史上下文中逐字节相同。
+新旧 tag 注释正文都仍引用旧 closure commit `6553333...`，不能把注释正文当作当前
+peeled target 的证明。

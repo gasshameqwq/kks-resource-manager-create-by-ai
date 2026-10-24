@@ -1,8 +1,9 @@
 # PROJECT_STATE — 项目当前状态与权威文档入口
 
 > 文档类型：**当前状态登记（CURRENT STATE）**。不是冻结契约，不是阶段报告。
-> 最后更新：2026-10-19（将 Phase H2 关闭成果迁移到已清洗的远端历史；保留
-> 2026-10-18 的 Conditional PASS 结论和未解决证据限制）
+> 最后更新：2026-10-21（补充 Phase 3.4 的 H2 前后 Git 对象对照、证据强度与限制；
+> 记录 Gemini 接替规划与独立技术审核后的当前协作职责模型；不改变阶段结论、
+> 冻结契约或未解决事项）
 >
 > 维护规则：
 > - 本文件只描述**当前**状态；历史结论仍以对应阶段报告为准，**不以本文件改写历史**。
@@ -23,6 +24,7 @@
 | 旧本地 `main` HEAD（H2 关闭文档提交；**不是**远端清洗后历史） | `880f26a86d91015192a3ce3085e187711d4772f8` | `git rev-parse main`（2026-10-19 核验） |
 | 已清洗远端 `main`（H2 发布基线） | `ca694778a21e01a849c735342a589397f101cc75` | `git rev-parse origin/main`；A4/A5 证据 |
 | H2 文档迁移工作分支基线 | `ca694778a21e01a849c735342a589397f101cc75`（`origin/main`） | 本文件迁移时现场核验 |
+| H2 文档迁移最新已提交基线（**历史证据治理前**） | 分支 `codex/phase-h2-docs-migration-20261019` · HEAD `9dd217f4691b4077d1c5bb53bdef214974ed035f` · 工作区 clean | `git rev-parse HEAD` / `git status`（2026-10-21 核验） |
 | 阶段关闭 tag（**旧本地 H2 前历史记录**） | `phase-3.3-closed` → 旧本地收尾提交；具体 tag object / peeled 对照见 §3.1 | 旧本地 tag refs（不与远端同名 tag 混用） |
 | 历史 tags（**旧本地历史基线记录；不是远端完整权威清单**） | `phase-2.0-closed` … `phase-2.4-closed`（`phase-2.4-closed` → `202c285`）· `phase-3.0-closed` → `c2fd527` · `phase-3.1-closed` → `99aa0d1` · `phase-3.2-closed` → `034a726` | 旧本地 `git tag -l`；远端同名 tags 见 §3.1 |
 | schema | `SCHEMA_VERSION == 2` · 16 张业务表 · `MIGRATIONS == {1, 2}` | `core/database/schema.py` |
@@ -40,7 +42,7 @@
 
 | 文档 | 职责 |
 | :--- | :--- |
-| `docs/WORKFLOW.md` | 长期协作规则：角色职责、标准流程与任务指令要求、暂停条件、文档分层与权限边界、审核与阶段状态、Git 授权规则 |
+| `docs/WORKFLOW.md` | 长期协作规则：用户 / Gemini / Codex 的职责、标准流程与任务指令要求、暂停条件、文档分层与权限边界、审核与阶段状态、Git 授权规则 |
 | `docs/PROJECT_STATE.md`（本文件） | 当前状态、已完成阶段、当前基线、下一步方向、**文档职责登记**、权威文档入口 |
 | 阶段 Contract | 冻结的目标、范围、架构约束、验收标准 |
 | Decision Report | 重要设计决策、备选方案、理由、状态及相关契约 |
@@ -50,14 +52,14 @@
 | Closure Report | 最终验收结论、测试证据、Git commit / tag |
 | `README.md` | 项目简介、当前状态、高层路线图 |
 | `docs/ARCHITECTURE.md` | 当前有效的架构（不得把已废弃设计描述成当前实现） |
-| 项目对话使用说明（非仓库文档） | ChatGPT 会话内的协作约定与沟通要求；**不取代**上述仓库文档 |
+| Gemini / Codex 对话说明（非仓库文档） | 对话内的协作上下文与沟通要求；**不取代**上述仓库文档 |
 
 **本表是文档职责的唯一登记入口**；`docs/WORKFLOW.md` 只保留协作所需的职责摘要与指向。
 
 **现状说明（避免误读为"文件已存在"）**：本表登记的是**职责 / 文档类型**，不是"仓库现有文件清单"。
 
 - 「大阶段总工作文档」「小阶段工作文档」为**文档类型定义**，目前**尚未创建**对应文件；是否创建属当前项目决策，不在本表决定（`docs/WORKFLOW.md` §5.1 只规定分层原则）。
-- 「项目对话使用说明」**不是仓库文件**，仅用于说明 ChatGPT 会话内的协作约定，不取代仓库文档。
+- 「Gemini / Codex 对话说明」**不是仓库文件**，仅补充会话内的协作上下文，不取代仓库文档。
 - 上表其余各项在仓库中均有对应产出：`docs/WORKFLOW.md`（已于提交 `41e0939` 纳入版本控制）、`docs/PROJECT_STATE.md`、各阶段 Contract、Decision Report、Implementation Log、Closure Report、`README.md`、`docs/ARCHITECTURE.md`。
 
 以上为职责定义，不代表每个阶段必须产出全部类型。
@@ -85,6 +87,28 @@
   一律以对应 Closure Report 为准。
 - 不允许两个文档在没有解释的情况下对同一决策给出相互矛盾的当前结论。发生冲突时，
   不得猜测哪个版本正确，必须核对冻结记录、授权记录、实施证据与当前代码，并在本文件登记现行权威。
+
+### 2.3 当前协作职责模型
+
+本节登记当前确认的职责模型；具体流程、暂停条件与审核方法以
+[`docs/WORKFLOW.md`](./WORKFLOW.md) §1–§9 为长期协作规范。
+
+| 角色 | 当前职责 |
+| :--- | :--- |
+| **用户** | 决定项目方向和功能优先级；批准阶段计划、适用契约与实施范围；保留最终验收权，并决定审核发现应触发修复、有条件接受还是拒绝；授权具体 Git 操作。 |
+| **Gemini** | 制定阶段计划与架构提案；起草供用户审批的阶段契约；准备 Codex 实施任务指令；独立审核代码、测试、文档、范围合规性和 Git 证据；区分已验证事实、推断、未验证事项、风险与遗留问题。 |
+| **Codex** | 只实施明确获准的任务与契约；运行适当测试和检查；更新获准修改的文档与实施记录；汇报实际变更、已执行检查、结果、遗留问题和相关 Git 证据；遇到阻断条件时停止受影响工作并报告。 |
+
+协作边界：
+
+- 规划或起草契约不构成实施授权；实施只在用户批准适用范围与契约后开始。
+- Gemini 的独立技术审核不代替用户的最终验收，也不得代替用户授权实施。
+- commit、创建或移动 tag、push、重写历史或清理无关修改必须获得匹配具体任务的
+  明确授权，不得从其他工作状态推定。
+- 遇到契约冲突、重大风险、未经授权的范围扩大、未解决的测试失败或数据安全问题，
+  Codex 必须停止受影响的工作并报告。
+- 既有冻结契约、已关闭阶段的结论和当前阶段状态不因本职责模型迁移而改变。
+- 尚未冻结的后续方向仍只是方向，不得描述为已批准或进行中。
 
 ---
 
@@ -116,10 +140,39 @@ Phase 3.4 完整历史的隐私整改、候选验证与现有 GitHub 仓库发�
 - 远端保留 10 个阶段 tags；名称、类型、对象和 peeled 关系以 A4/A5 证据为准。
 - 旧本地 `main` 和同名 tags 仍属于 H2 前的分离历史，不得把其 commit/tag object
   当作远端清洗后对象，也不得将旧本地谱系合并或强制推送到远端。
-- 当前文档迁移分支以 `origin/main` 的 `ca694778...` 为基线，仅准备 H2 关闭
-  报告与本次状态同步；在完成审核和另行授权前不创建 commit、不 push、不修改 tag。
+- H2 文档迁移分支以 `origin/main` 的 `ca694778...` 为基线；迁移提交
+  `9dd217f4691b4077d1c5bb53bdef214974ed035f` 已将 H2 关闭报告和本次状态同步
+  纳入版本控制，远端同名工作分支指向该提交。该历史事实不表示 H2 前本地 tags
+  已被更新。
 - 关闭结论保持 **CONDITIONAL PASS**；五项未解决限制见 §7 和
   [PHASE_H2_CLOSURE_REPORT.md](./PHASE_H2_CLOSURE_REPORT.md)。
+
+### 3.2 Phase 3.4 — H2 前后 Git 对象对照
+
+本节保留 H2 前对象作为历史证据，同时登记清洗后当前谱系中的对应对象。以下对照
+**不替换**原阶段报告、实施日志或 tag 注释中的历史值。
+
+| 节点 | H2 前对象（**保留，历史值**） | 清洗后对象（当前谱系） | 本次可复核证据 |
+| :--- | :--- | :--- | :--- |
+| Phase 3.4 契约冻结 | `632eb4c7dcaa593208c2a52911273896cbb2cef7` | `7704a98a4569f8148494a0618bb11019ef1e1189` | 提交说明与作者时间一致；父链位置对应；`git patch-id --stable` 同为 `4caba32e90bd9d13eeb4c53162ef876a1b9177cb` |
+| Phase 3.4 实施 | `ef362fd19e79a67dd496ef5751393244844131a2` | `efffae65c2d66256b5522704a77f50cf38917687` | 提交说明与作者时间一致；父链位置对应；patch-id 同为 `c77848125b32ae263297b36f52aa77861fbc5fa9` |
+| 关闭前文档状态修正 | `9e694cf1573ba744ec26f896fe36413a6ac483ff` | `0c1ea2ceff2a2c9e01470ad4a4ecdd592ee113e5` | 提交说明与作者时间一致；父链位置对应；patch-id 同为 `270c4ce46b341600c2a3fe0ff3ce77b5f41ed158` |
+| Phase 3.4 正式关闭 | `6553333f832de03468af7945294002ba37d040ef` | `11d2a1498ab63d3b3518e6723337185a5321c347` | 提交说明与作者时间一致；父链位置对应；patch-id 同为 `24da1c0132a74a70c68b13ecefc5f78aacc6f539` |
+| 关闭后状态协调 | `442a980a994614623405ecf3243f90e461991ea0` | `198908c299472672be6ed5590c9a3ddfaeca234a` | 提交说明与作者时间一致；父链位置对应；patch-id 同为 `c7afb8d051075bcd2b8ad3ff767b2389ea5404f8` |
+| tag `phase-3.4-closed` | object `0cae547c7c21cc1a754b147726f022a3396d38c3` → commit `6553333...` | 远端 object `294336feeac2a9813f21d11a8a147fa522c71fd5` → commit `11d2a149...` | 2026-10-21 只读 `git ls-remote` 直接核验远端 object 与 peeled target |
+
+**证据强度**：五组提交均有相同的提交说明、作者时间和对应父链位置，且实际差异的
+`git patch-id --stable` 完全一致。这足以支持“清洗后对应提交”的文档对照与审计导航，
+但不能表述为已经取得正式 A4/A5 映射表，也不能据此证明新旧提交的整棵树在所有历史
+上下文中逐字节相同。
+
+**限制**：
+
+- H2 报告未在仓库内发布完整的“旧 SHA → 清洗后 SHA”正式映射；原始 A4/A5 证据只以
+  受控逻辑位置登记，本次未直接复核其原始产物。
+- 新旧 tag 注释的正文都仍写着旧关闭提交 `6553333...`；远端 tag 的实际 peeled target
+  由 `git ls-remote` 核验为 `11d2a14...`。因此 tag 注释正文不能单独作为当前目标依据。
+- 本地 tag 仍是 H2 前对象，不得与远端同名 tag 混用。
 
 ---
 
@@ -174,17 +227,21 @@ annotated tag `phase-3.3-closed` 指向该收尾提交；完成时核验 `HEAD =
 
 **Phase 3.4 冻结、实施与关闭记录（事实，2026-10-18）**：权威契约为
 [phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_4_IMPLEMENTATION_CONTRACT.md)，
-状态 **FROZEN**（2026-10-17，冻结提交 `632eb4c`，`docs(phase3.4): freeze implementation contract`）。
+状态 **FROZEN**（2026-10-17，H2 前冻结提交 `632eb4c`；清洗后对应冻结提交
+`7704a98`，证据与限制见 §3.2）。
 G-2 实施已完成（零功能增量：仅核验 + 文档 + 测试），**无生产代码变更**；全量测试
 `943 passed`（实施轮 52.07 s；G-3 提交前复跑 43.07 s，来源 `PHASE3_4_LOG.md` §5.2 / §9）。
-Implementation commit：`efffae65c2d66256b5522704a77f50cf38917687`
+Implementation commit：H2 前 `ef362fd19e79a67dd496ef5751393244844131a2`；清洗后
+`efffae65c2d66256b5522704a77f50cf38917687`
 （`test(phase3.4): verify display name and effective type behavior`，8 files，+459/−21）。
-文档状态修正 commit：`0c1ea2ceff2a2c9e01470ad4a4ecdd592ee113e5`
+文档状态修正 commit：H2 前 `9e694cf1573ba744ec26f896fe36413a6ac483ff`；清洗后
+`0c1ea2ceff2a2c9e01470ad4a4ecdd592ee113e5`
 （`docs(phase3.4): correct finalization status`，3 files，+54/−6）。
 G-3 的提交前核验、focused/全量测试、implementation commit、文档修正 commit 与提交后核验已完成；
-**Phase 3.4 tag `phase-3.4-closed`（annotated，tag object
-`294336feeac2a9813f21d11a8a147fa522c71fd5`，peeled
-`11d2a1498ab63d3b3518e6723337185a5321c347`）已创建并推送至 `origin`**
+**Phase 3.4 tag `phase-3.4-closed` 的 H2 前 annotated 对象为
+`0cae547c7c21cc1a754b147726f022a3396d38c3` → `6553333f832de03468af7945294002ba37d040ef`；
+清洗后远端 annotated 对象为 `294336feeac2a9813f21d11a8a147fa522c71fd5` →
+`11d2a1498ab63d3b3518e6723337185a5321c347`**
 （`https://github.com/gasshameqwq/kks-resource-manager-create-by-ai.git`）。实施/关闭报告见
 [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)。
 **阶段已于 2026-10-18 CLOSED / CONDITIONAL PASS**；非阻断事项（T-A2 断言独立性、

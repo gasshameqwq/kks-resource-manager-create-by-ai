@@ -5,6 +5,8 @@
 > 文档类型：Phase 3.4 **最终关闭报告（Closure Report）**
 > 日期：2026-10-18
 > 状态：**CLOSED / CONDITIONAL PASS**
+> H2 历史对照更新：2026-10-21（旧 Git 值原样保留；清洗后对象与证据限制见
+> “H2 Sanitized-History Correlation”）
 
 ---
 
@@ -30,6 +32,10 @@ CLOSED / CONDITIONAL PASS
 - Implementation commit：`ef362fd19e79a67dd496ef5751393244844131a2`。
 - 文档状态修正 commit：`9e694cf1573ba744ec26f896fe36413a6ac483ff`。
 - 最终关闭提交：即本报告所在提交（自引用，不内嵌自身 hash）。
+
+> **历史口径**：以上是 H2 前的阶段关闭证据，必须原样保留。H2 重写历史后，
+> 当前远端谱系中的对应对象见下方“H2 Sanitized-History Correlation”。旧提交号
+> 不再直接指向当前远端谱系，但其历史记录不能被静默替换。
 
 ### Implementation
 
@@ -67,9 +73,10 @@ CLOSED / CONDITIONAL PASS
 | Phase 3.4 tag | 阶段关闭时未创建；后续已创建 `phase-3.4-closed`（见 Post-Closure Publication） |
 | Push | 阶段关闭时未执行；后续已推送至 `origin` |
 
-### Post-Closure Publication（2026-10-18）
+### Post-Closure Publication（H2 前发布记录，2026-10-18）
 
-阶段关闭后完成的发布操作，不改变 `CLOSED / CONDITIONAL PASS` 结论：
+下表保留 H2 前的发布记录，不改变 `CLOSED / CONDITIONAL PASS` 结论。H2 之后
+远端同名 tag 已重写；当前远端对象不得从本历史表推定。
 
 | 项 | 值 |
 | :--- | :--- |
@@ -78,7 +85,28 @@ CLOSED / CONDITIONAL PASS
 | Peeled commit | `6553333f832de03468af7945294002ba37d040ef` |
 | Remote | `origin` → `https://github.com/gasshameqwq/kks-resource-manager-create-by-ai.git` |
 | Push | 已完成（仅推送 `refs/tags/phase-3.4-closed`） |
-| Remote verification | `git ls-remote` 返回相同 tag object 与 peeled commit |
+| Remote verification（H2 前，2026-10-18） | 当时 `git ls-remote` 返回上表相同 tag object 与 peeled commit |
+
+### H2 Sanitized-History Correlation（2026-10-21）
+
+以下只增加对照，不替换本报告上方保留的 H2 前历史值：
+
+| 节点 | H2 前对象（保留） | 清洗后对象（当前谱系） | 证据 |
+| :--- | :--- | :--- | :--- |
+| Contract 冻结 | `632eb4c7dcaa593208c2a52911273896cbb2cef7` | `7704a98a4569f8148494a0618bb11019ef1e1189` | patch-id `4caba32e90bd9d13eeb4c53162ef876a1b9177cb` 相同 |
+| Implementation | `ef362fd19e79a67dd496ef5751393244844131a2` | `efffae65c2d66256b5522704a77f50cf38917687` | patch-id `c77848125b32ae263297b36f52aa77861fbc5fa9` 相同 |
+| 文档状态修正 | `9e694cf1573ba744ec26f896fe36413a6ac483ff` | `0c1ea2ceff2a2c9e01470ad4a4ecdd592ee113e5` | patch-id `270c4ce46b341600c2a3fe0ff3ce77b5f41ed158` 相同 |
+| 正式关闭 | `6553333f832de03468af7945294002ba37d040ef` | `11d2a1498ab63d3b3518e6723337185a5321c347` | patch-id `24da1c0132a74a70c68b13ecefc5f78aacc6f539` 相同 |
+| 关闭后状态协调 | `442a980a994614623405ecf3243f90e461991ea0` | `198908c299472672be6ed5590c9a3ddfaeca234a` | patch-id `c7afb8d051075bcd2b8ad3ff767b2389ea5404f8` 相同 |
+| tag `phase-3.4-closed` | object `0cae547c7c21cc1a754b147726f022a3396d38c3` → `6553333...` | 远端 object `294336feeac2a9813f21d11a8a147fa522c71fd5` → `11d2a149...` | 2026-10-21 只读 `git ls-remote` |
+
+**证据强度**：五组提交除 patch-id 相同外，提交说明、作者时间与父链位置也对应；
+这是仓库内可以重复复核的强关联。它不是 H2 报告中已正式发布的完整映射表，也不
+证明新旧提交的整棵树在所有上下文中逐字节相同。A4/A5 原始证据本次未直接复核。
+
+**tag 特别限制**：新旧 tag 注释正文都仍写着旧 closure commit `6553333...`；
+远端 tag 的实际 peeled target 由 `git ls-remote` 核验为 `11d2a149...`。因此不能仅凭
+tag 注释正文判断当前目标。
 
 ### Definition of Done 核对
 
@@ -108,7 +136,8 @@ CLOSED / CONDITIONAL PASS
   `9e694cf` 与提交后核验已完成；**阶段关闭时 tag/push 尚未执行；其后已完成**（见 Post-Closure Publication）。
 - `PROJECT_STATE.md` / `README.md` / 本报告 / `PHASE3_4_LOG.md` 已同步为
   `CLOSED / CONDITIONAL PASS`；`docs/ARCHITECTURE.md` 的 3.4 状态行已在后续文档一致性修复中
-  同步（工作区修改，未提交）。
+  同步。关闭时曾记录为“工作区修改，未提交”；该时点状态后由 `198908c`
+  纳入版本控制，当前历史对照见上面 H2 小节。
 
 ### Open Items
 
@@ -136,4 +165,6 @@ CLOSED / CONDITIONAL PASS
 - 测试：`tests/test_search_core.py`、`tests/test_database_schema.py`、`tests/test_query_model.py`
 - 架构：`docs/ARCHITECTURE.md`
 - Commit 证据：`ef362fd19e79a67dd496ef5751393244844131a2`（implementation）、
-  `9e694cf1573ba744ec26f896fe36413a6ac483ff`（文档修正）。
+  `9e694cf1573ba744ec26f896fe36413a6ac483ff`（文档修正）。清洗后对应提交分别为
+  `efffae65c2d66256b5522704a77f50cf38917687` 和
+  `0c1ea2ceff2a2c9e01470ad4a4ecdd592ee113e5`。
