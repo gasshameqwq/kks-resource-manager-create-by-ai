@@ -26,6 +26,17 @@
     python main.py resource set-type <id|路径> <类型>
                                                用户数据编辑（Phase 3.1；薄适配层）
 
+    python main.py tag create <name> [--color <c>] [--category <cat>]
+    python main.py tag list
+    python main.py tag rename <old_name_or_id> <new_name>
+    python main.py tag delete <name_or_id>
+                                               标签管理（Phase 3.5.1）
+    python main.py resource add-tag <resource_id> <tag_name>
+    python main.py resource remove-tag <resource_id> <tag_name>
+    python main.py resource favorite <resource_id>
+    python main.py resource unfavorite <resource_id>
+                                               标签 / 收藏写入口（Phase 3.5.1）
+
     python main.py gui                        启动 PyQt6 图形界面（Phase 1.4-C）
 
 GUI 逻辑全部放在 ``ui/`` 中，本入口只负责创建 ``QApplication`` 并进入事件循环；
@@ -43,6 +54,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import __phase__, __version__  # noqa: E402
 from core import app_paths  # noqa: E402
 from cli_query import add_query_parser, dispatch_query  # noqa: E402
+
+
+def _bootstrap_system_tags() -> None:
+    """在 CLI 启动路径上幂等保证保留系统 Tag 已就绪。
+
+    这是数据 seed，不是 schema migration。写操作统一委托
+    ``TagWriteService.ensure_system_tags()``，入口本身不接触 SQL。
+    """
+    from core.app import TagWriteService
+    from core.database import db as database
+
+    database.initialize()
+    conn = database.connect()
+    try:
+        TagWriteService(conn).ensure_system_tags()
+    finally:
+        conn.close()
 
 
 def _open_store():
@@ -399,6 +427,228 @@ def _dispatch_resource(args) -> int:
         return cmd_resource_set_notes(args.target, args.value, args.clear)
     if command == "set-type":
         return cmd_resource_set_type(args.target, args.value)
+    if command in ("add-tag", "remove-tag"):
+        return _run_resource_tag_command(
+            args.target, args.tag_name, assign=command == "add-tag"
+        )
+    if command in ("favorite", "unfavorite"):
+        return _run_resource_favorite_command(
+            args.target, favorite=command == "favorite"
+        )
+    return 2  # pragma: no cover - argparse 已保证不会走到这里
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.5.1 —— Tag / Favorite CLI 薄写入口
+# ---------------------------------------------------------------------------
+#
+#     CLI → ResourceQuery / TagQuery（只读解析） → TagWriteService → DB
+#
+# 本层不写 SQL，不复制 Tag 语义；冲突、系统标签保护、幂等与事务全部由
+# TagWriteService 负责。
+
+
+def _tag_context():
+    """初始化数据库并返回 ``(conn, TagQuery, TagWriteService)``。"""
+    from core.app import TagWriteService
+    from core.database import db as database
+    from core.query import TagQuery
+
+    database.initialize()
+    conn = database.connect()
+    return conn, TagQuery(conn), TagWriteService(conn)
+
+
+def _tag_resource_context():
+    """返回标签写命令所需的只读查询对象与 Tag 写服务。"""
+    from core.app import TagWriteService
+    from core.database import db as database
+    from core.query import ResourceQuery, TagQuery
+
+    database.initialize()
+    conn = database.connect()
+    return (
+        conn,
+        ResourceQuery(conn),
+        TagQuery(conn),
+        TagWriteService(conn),
+    )
+
+
+def _resolve_tag(query, target: str):
+    """按 id 优先、``name_key`` 精确匹配解析 Tag；未知返回 ``None``。"""
+    text = (target or "").strip()
+    if not text:
+        return None
+    if text.isdigit():
+        found = query.get(int(text))
+        if found is not None:
+            return found
+    return query.find_by_name(text)
+
+
+def _report_tag_write_error(exc: Exception) -> int:
+    """把 Tag 域异常转换为稳定的 CLI 错误输出。"""
+    from core.app import (
+        InvalidTagValue,
+        ReservedTagName,
+        ResourceNotFound,
+        SystemTagImmutable,
+        TagNameConflict,
+        TagNotFound,
+    )
+
+    if isinstance(exc, ResourceNotFound):
+        print(f"找不到资源：{exc.resource_id}", file=sys.stderr)
+    elif isinstance(exc, TagNotFound):
+        print(f"找不到标签：{exc.tag_id}", file=sys.stderr)
+    elif isinstance(exc, TagNameConflict):
+        print(f"标签名已存在：{exc.name_key!r}；不会自动合并。", file=sys.stderr)
+    elif isinstance(exc, ReservedTagName):
+        print(f"标签名是系统保留名：{exc.name_key!r}", file=sys.stderr)
+    elif isinstance(exc, SystemTagImmutable):
+        print(
+            f"系统标签不可重命名或删除：{exc.tag_id}",
+            file=sys.stderr,
+        )
+    elif isinstance(exc, InvalidTagValue):
+        print(f"非法取值（{exc.field}）：{exc.value!r}", file=sys.stderr)
+    else:
+        print(f"标签写入失败：{exc}", file=sys.stderr)
+    return 1
+
+
+def cmd_tag_create(name: str, color: str | None, category: str | None) -> int:
+    """创建用户标签。"""
+    from core.app import TagWriteError
+
+    conn, _query, service = _tag_context()
+    try:
+        try:
+            tag_id = service.create_tag(name, color=color, category=category)
+        except TagWriteError as exc:
+            return _report_tag_write_error(exc)
+        print(f"已创建标签 [{tag_id}]：{name.strip()}")
+        return 0
+    finally:
+        conn.close()
+
+
+def cmd_tag_list() -> int:
+    """列出全部标签（含系统标签）。"""
+    conn, query, _service = _tag_context()
+    try:
+        tags = query.list()
+        print("ID\tNAME\tCOLOR\tCATEGORY\tSYSTEM")
+        for tag in tags:
+            print(
+                f"{tag.id}\t{tag.name}\t{tag.color or '-'}\t"
+                f"{tag.category or '-'}\t{'yes' if tag.is_system else 'no'}"
+            )
+        return 0
+    finally:
+        conn.close()
+
+
+def cmd_tag_rename(target: str, new_name: str) -> int:
+    """按名称或 id 重命名用户标签；冲突由服务层拒绝。"""
+    from core.app import TagWriteError
+
+    conn, query, service = _tag_context()
+    try:
+        tag = _resolve_tag(query, target)
+        if tag is None:
+            print(f"找不到标签：{target}", file=sys.stderr)
+            return 1
+        try:
+            service.rename_tag(tag.id, new_name)
+        except TagWriteError as exc:
+            return _report_tag_write_error(exc)
+        print(f"已重命名标签 [{tag.id}]：{tag.name} → {new_name.strip()}")
+        return 0
+    finally:
+        conn.close()
+
+
+def cmd_tag_delete(target: str) -> int:
+    """按名称或 id 删除用户标签；系统标签由服务层拒绝。"""
+    from core.app import TagWriteError
+
+    conn, query, service = _tag_context()
+    try:
+        tag = _resolve_tag(query, target)
+        if tag is None:
+            print(f"找不到标签：{target}", file=sys.stderr)
+            return 1
+        try:
+            service.delete_tag(tag.id)
+        except TagWriteError as exc:
+            return _report_tag_write_error(exc)
+        print(f"已删除标签 [{tag.id}]：{tag.name}")
+        return 0
+    finally:
+        conn.close()
+
+
+def _run_resource_tag_command(target: str, tag_name: str, *, assign: bool) -> int:
+    """资源打标 / 去标的共用薄流程。"""
+    from core.app import TagWriteError
+
+    conn, resource_query, tag_query, service = _tag_resource_context()
+    try:
+        resource_id = _resolve_resource_id(resource_query, target)
+        if resource_id is None:
+            print(f"找不到资源：{target}", file=sys.stderr)
+            return 1
+        tag = tag_query.find_by_name(tag_name)
+        if tag is None:
+            print(f"找不到标签：{tag_name}", file=sys.stderr)
+            return 1
+        try:
+            if assign:
+                service.assign_tag(resource_id, tag.id)
+                print(f"已为资源 #{resource_id} 添加标签：{tag.name}")
+            else:
+                service.unassign_tag(resource_id, tag.id)
+                print(f"已从资源 #{resource_id} 移除标签：{tag.name}")
+        except TagWriteError as exc:
+            return _report_tag_write_error(exc)
+        return 0
+    finally:
+        conn.close()
+
+
+def _run_resource_favorite_command(target: str, *, favorite: bool) -> int:
+    """收藏 / 取消收藏的共用薄流程。"""
+    from core.app import TagWriteError
+
+    conn, resource_query, _tag_query, service = _tag_resource_context()
+    try:
+        resource_id = _resolve_resource_id(resource_query, target)
+        if resource_id is None:
+            print(f"找不到资源：{target}", file=sys.stderr)
+            return 1
+        try:
+            service.set_favorite(resource_id, favorite)
+        except TagWriteError as exc:
+            return _report_tag_write_error(exc)
+        action = "收藏" if favorite else "取消收藏"
+        print(f"已{action}资源 #{resource_id}")
+        return 0
+    finally:
+        conn.close()
+
+
+def _dispatch_tag(args) -> int:
+    command = args.tag_command
+    if command == "create":
+        return cmd_tag_create(args.name, args.color, args.category)
+    if command == "list":
+        return cmd_tag_list()
+    if command == "rename":
+        return cmd_tag_rename(args.target, args.new_name)
+    if command == "delete":
+        return cmd_tag_delete(args.target)
     return 2  # pragma: no cover - argparse 已保证不会走到这里
 
 
@@ -456,7 +706,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Phase 3.1：用户数据编辑（薄适配层 → ResourceWriteService）
     resource = sub.add_parser(
-        "resource", help="编辑资源上的用户数据（展示名 / 备注 / 用户类型）"
+        "resource",
+        help="编辑资源上的用户数据（展示名 / 备注 / 类型 / 标签 / 收藏）",
     )
     resource_sub = resource.add_subparsers(dest="resource_command", required=True)
 
@@ -482,6 +733,37 @@ def build_parser() -> argparse.ArgumentParser:
     type_cmd.add_argument("target", help="资源的 id / 路径 / path_key / relative_path")
     type_cmd.add_argument("value", help="资源类型（见 core.models.RESOURCE_TYPES）")
 
+    add_tag = resource_sub.add_parser("add-tag", help="为资源添加用户标签")
+    add_tag.add_argument("target", help="资源 id（也接受既有路径解析形式）")
+    add_tag.add_argument("tag_name", help="标签名称（精确、大小写不敏感）")
+
+    remove_tag = resource_sub.add_parser("remove-tag", help="从资源移除用户标签")
+    remove_tag.add_argument("target", help="资源 id（也接受既有路径解析形式）")
+    remove_tag.add_argument("tag_name", help="标签名称（精确、大小写不敏感）")
+
+    favorite = resource_sub.add_parser("favorite", help="收藏资源")
+    favorite.add_argument("target", help="资源 id（也接受既有路径解析形式）")
+
+    unfavorite = resource_sub.add_parser("unfavorite", help="取消收藏资源")
+    unfavorite.add_argument("target", help="资源 id（也接受既有路径解析形式）")
+
+    tag = sub.add_parser("tag", help="创建、列出、重命名或删除标签")
+    tag_sub = tag.add_subparsers(dest="tag_command", required=True)
+
+    tag_create = tag_sub.add_parser("create", help="创建用户标签")
+    tag_create.add_argument("name", help="标签名称")
+    tag_create.add_argument("--color", default=None, help="可选颜色文本")
+    tag_create.add_argument("--category", default=None, help="可选分类文本")
+
+    tag_sub.add_parser("list", help="列出全部标签（含系统标签）")
+
+    tag_rename = tag_sub.add_parser("rename", help="重命名用户标签")
+    tag_rename.add_argument("target", help="标签 id 或当前名称")
+    tag_rename.add_argument("new_name", help="新标签名称")
+
+    tag_delete = tag_sub.add_parser("delete", help="删除用户标签")
+    tag_delete.add_argument("target", help="标签 id 或当前名称")
+
     sub.add_parser("gui", help="启动图形界面（Phase 1.4-C）")
 
     return parser
@@ -494,6 +776,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.version:
         print(f"{__version__} ({__phase__})")
         return 0
+
+    try:
+        _bootstrap_system_tags()
+    except Exception as exc:  # noqa: BLE001 - CLI 边界：输出原因并返回非零
+        print(f"系统标签初始化失败：{exc}", file=sys.stderr)
+        return 1
+
     if args.init_db:
         return cmd_init_db()
     if getattr(args, "command", None) == "library":
@@ -502,6 +791,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_scan(args.target, full=args.full)
     if getattr(args, "command", None) == "query":
         return dispatch_query(args)
+    if getattr(args, "command", None) == "tag":
+        return _dispatch_tag(args)
     if getattr(args, "command", None) == "resource":
         return _dispatch_resource(args)
     if getattr(args, "command", None) == "gui":
