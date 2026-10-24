@@ -1,4 +1,4 @@
-"""右栏：资源详情面板 —— Phase 1.4-C-1 → Phase 3.5.2。
+"""右栏：资源详情面板 —— Phase 1.4-C-1 → Phase 3.5.2 / 4.2。
 
 结构（普通 Qt Widgets，无 MVC/MVVM、无自定义 delegate）::
 
@@ -108,6 +108,7 @@ _INSTALLED_MARK = "已安装"
 _MISSING_COLOR = QColor(176, 0, 32)
 _TAG_ID_ROLE = int(Qt.ItemDataRole.UserRole)
 _TAG_SYSTEM_ROLE = _TAG_ID_ROLE + 1
+_PLUGIN_GUID_ROLE = _TAG_SYSTEM_ROLE + 1
 
 
 def format_file_size(size: int | None) -> str:
@@ -176,6 +177,9 @@ class DetailPanel(QWidget):
 
     #: 用户在 MOD 依赖表里点「按此 MOD 筛选」时发出（payload = mod guid）。
     mod_filter_requested = pyqtSignal(object)
+    sha256_filter_requested = pyqtSignal(object)
+    author_filter_requested = pyqtSignal(int)
+    plugin_filter_requested = pyqtSignal(object)
     tag_assign_requested = pyqtSignal(int, int)
     tag_unassign_requested = pyqtSignal(int, int)
     tag_create_requested = pyqtSignal(int, str)
@@ -221,6 +225,7 @@ class DetailPanel(QWidget):
         self._build_management_section()
         self._build_user_edit_section()
         self._build_basic_section()
+        self._build_duplicates_section()
         self._build_authors_section()
         self._build_mods_section()
         self._build_usage_section()
@@ -378,9 +383,44 @@ class DetailPanel(QWidget):
         self.authors_section = self._add_section("authors", "作者", expanded=True)
         self.authors_label = QLabel("")
         self.authors_label.setWordWrap(True)
+        self.author_buttons_widget = QWidget()
+        self._author_buttons_layout = QVBoxLayout(self.author_buttons_widget)
+        self._author_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        self._author_buttons_layout.setSpacing(2)
+        self._author_buttons: dict[int, QPushButton] = {}
         layout = QVBoxLayout()
         layout.addWidget(self.authors_label)
+        layout.addWidget(self.author_buttons_widget)
         self.authors_section.set_content_layout(layout)
+
+    def _build_duplicates_section(self) -> None:
+        self.duplicates_section = self._add_section(
+            "duplicates", "字节完全相同的副本", expanded=True
+        )
+        self.duplicates_summary = QLabel("没有其它文件字节完全相同的资源")
+        self.duplicates_summary.setWordWrap(True)
+        self.duplicates_table = QTableWidget(0, 3)
+        self.duplicates_table.setHorizontalHeaderLabels(["ID", "名称", "相对路径"])
+        self.duplicates_table.verticalHeader().setVisible(False)
+        self.duplicates_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.duplicates_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.duplicates_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.duplicates_table.horizontalHeader().setStretchLastSection(True)
+        self.duplicates_table.setMaximumHeight(180)
+        self.sha256_filter_button = QPushButton("筛选同组副本")
+        self.sha256_filter_button.setEnabled(False)
+        self.sha256_filter_button.clicked.connect(self._on_sha256_filter_clicked)
+        layout = QVBoxLayout()
+        layout.addWidget(self.duplicates_summary)
+        layout.addWidget(self.duplicates_table)
+        layout.addWidget(self.sha256_filter_button)
+        self.duplicates_section.set_content_layout(layout)
 
     def _build_mods_section(self) -> None:
         self.mods_section = self._add_section("mods", "MOD 依赖", expanded=True)
@@ -428,6 +468,7 @@ class DetailPanel(QWidget):
         self.plugins_label.setWordWrap(True)
         self.plugins_list = QListWidget()
         self.plugins_list.setMaximumHeight(160)
+        self.plugins_list.itemClicked.connect(self._on_plugin_clicked)
         layout = QVBoxLayout()
         layout.addWidget(self.plugins_label)
         layout.addWidget(self.plugins_list)
@@ -467,6 +508,7 @@ class DetailPanel(QWidget):
         self._current_detail = None
         self._current_reasons = ()
         self._current_duplicate_group = None
+        self._render_duplicates(None)
         self.write_feedback.setText("")
         self.tag_list.clear()
         self.existing_tag_combo.clear()
@@ -481,6 +523,7 @@ class DetailPanel(QWidget):
         self._current_detail = None
         self._current_reasons = ()
         self._current_duplicate_group = None
+        self._render_duplicates(None)
         self.write_feedback.setText("")
         self._status_label.setText(f"找不到资源 #{int(resource_id)}")
         self._stack.setCurrentIndex(0)
@@ -489,6 +532,7 @@ class DetailPanel(QWidget):
         self._current_detail = None
         self._current_reasons = ()
         self._current_duplicate_group = None
+        self._render_duplicates(None)
         self.write_feedback.setText("")
         self._status_label.setText(f"读取详情失败：{text}")
         self._stack.setCurrentIndex(0)
@@ -528,6 +572,7 @@ class DetailPanel(QWidget):
         self._render_management(detail)
         self._render_user_edit(detail)
         self._render_basic(detail, duplicate_group)
+        self._render_duplicates(duplicate_group)
         self._render_authors(detail)
         self._render_mods(detail)
         self._render_usage(detail)
@@ -771,11 +816,65 @@ class DetailPanel(QWidget):
             label: text for label, text in tooltips.items() if text
         }
 
+    def _render_duplicates(self, duplicate_group: DuplicateGroup | None) -> None:
+        """展示当前 ``DuplicateGroup`` 的全部成员；数据完全来自传入 DTO。"""
+        self.duplicates_table.setRowCount(0)
+        self._duplicates_rows: list[tuple[int, str, str]] = []
+        is_duplicate = bool(
+            duplicate_group is not None
+            and duplicate_group.member_count > 1
+            and bool(duplicate_group.sha256)
+        )
+        if is_duplicate:
+            self.duplicates_summary.setText(
+                f"共 {duplicate_group.member_count} 个字节完全相同的资源"
+            )
+            for resource in duplicate_group.resources:
+                row = (
+                    int(resource.id),
+                    display_title(resource),
+                    resource.relative_path or "-",
+                )
+                self._duplicates_rows.append(row)
+                row_index = self.duplicates_table.rowCount()
+                self.duplicates_table.insertRow(row_index)
+                for column, text in enumerate((str(row[0]), row[1], row[2])):
+                    self.duplicates_table.setItem(
+                        row_index, column, QTableWidgetItem(text)
+                    )
+        else:
+            self.duplicates_summary.setText(
+                "没有其它文件字节完全相同的资源"
+            )
+        has_rows = bool(self._duplicates_rows)
+        self.duplicates_table.setVisible(has_rows)
+        self.sha256_filter_button.setEnabled(is_duplicate)
+        self.sha256_filter_button.setToolTip(
+            duplicate_group.sha256 if is_duplicate else ""
+        )
+
     def _render_authors(self, detail: ResourceDetail) -> None:
+        self._clear_author_buttons()
         if detail.authors:
             names = [author.name for author in detail.authors]
             self.authors_label.setText("\n".join(names))
+            # 保留文本访问器的既有语义，同时用按钮提供可点击入口。
+            self.authors_label.setVisible(False)
+            for author in detail.authors:
+                author_id = int(author.author_id)
+                button = QPushButton(author.name)
+                button.setToolTip(f"按作者反查资源：{author.name}")
+                button.clicked.connect(
+                    lambda _checked=False, aid=author_id: (
+                        self.author_filter_requested.emit(aid)
+                    )
+                )
+                self._author_buttons[author_id] = button
+                self._author_buttons_layout.addWidget(button)
+            self.author_buttons_widget.setVisible(True)
         else:
+            self.authors_label.setVisible(True)
+            self.author_buttons_widget.setVisible(False)
             raw = detail.metadata.get("authors_raw")
             if isinstance(raw, list) and raw:
                 self.authors_label.setText(
@@ -783,6 +882,12 @@ class DetailPanel(QWidget):
                 )
             else:
                 self.authors_label.setText("无作者信息")
+
+    def _clear_author_buttons(self) -> None:
+        for button in self._author_buttons.values():
+            self._author_buttons_layout.removeWidget(button)
+            button.deleteLater()
+        self._author_buttons.clear()
 
     def _render_mods(self, detail: ResourceDetail) -> None:
         self.mod_table.setRowCount(0)
@@ -835,8 +940,22 @@ class DetailPanel(QWidget):
     def _render_plugins(self, detail: ResourceDetail) -> None:
         self.plugins_list.clear()
         for guid in detail.plugins:
-            self.plugins_list.addItem(guid)
+            self.plugins_list.addItem(str(guid))
+            item = self.plugins_list.item(self.plugins_list.count() - 1)
+            if item is not None:
+                item.setData(_PLUGIN_GUID_ROLE, str(guid))
+                item.setToolTip(f"按插件反查资源：{guid}")
         self.plugins_label.setVisible(not detail.plugins)
+
+    def _on_plugin_clicked(self, item) -> None:
+        guid = item.data(_PLUGIN_GUID_ROLE) if item is not None else None
+        if guid is not None:
+            self.plugin_filter_requested.emit(str(guid))
+
+    def _on_sha256_filter_clicked(self) -> None:
+        group = self._current_duplicate_group
+        if group is not None and group.member_count > 1 and group.sha256:
+            self.sha256_filter_requested.emit(group.sha256)
 
     def _render_metadata(self, detail: ResourceDetail) -> None:
         metadata = detail.metadata or {}
@@ -1122,6 +1241,34 @@ class DetailPanel(QWidget):
 
     def plugin_rows(self) -> list[str]:
         return [self.plugins_list.item(i).text() for i in range(self.plugins_list.count())]
+
+    def author_rows(self) -> list[tuple[int, str]]:
+        return [
+            (author_id, button.text())
+            for author_id, button in self._author_buttons.items()
+        ]
+
+    def click_author(self, author_id: int) -> None:
+        button = self._author_buttons.get(int(author_id))
+        if button is not None:
+            button.click()
+
+    def click_plugin(self, index: int = 0) -> None:
+        if 0 <= index < self.plugins_list.count():
+            self._on_plugin_clicked(self.plugins_list.item(index))
+
+    def duplicate_rows(self) -> list[tuple[int, str, str]]:
+        return list(self._duplicates_rows)
+
+    def duplicate_sha256(self) -> str | None:
+        group = self._current_duplicate_group
+        return group.sha256 if group is not None else None
+
+    def is_sha256_filter_enabled(self) -> bool:
+        return self.sha256_filter_button.isEnabled()
+
+    def click_sha256_filter(self) -> None:
+        self.sha256_filter_button.click()
 
     def metadata_rows(self) -> dict[str, str]:
         return dict(getattr(self, "_metadata_rows", {}))

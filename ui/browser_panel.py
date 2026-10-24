@@ -1,4 +1,4 @@
-"""中栏：筛选栏 + 资源网格 + 底部状态 / 加载更多 —— Phase 1.4-C-2 / C-3。
+"""中栏：筛选栏 + 资源网格 + 底部状态 / 加载更多 —— Phase 1.4-C-2 / C-3 / 4.2。
 
 数据只经 ``BrowseService.page(...)``（**不允许**直接调用 ``ResourceQuery``）。
 本层不做搜索路由 / 排序 / 缺 MOD 判定 / 类型判定——这些都在 core 里，
@@ -138,6 +138,8 @@ class BrowserPanel(QWidget):
             author_id=self.filter_bar.author_id(),
             tag_id=self.filter_bar.tag_id(),
             favorite=self.filter_bar.favorite_filter(),
+            has_duplicates=self.filter_bar.has_duplicates_filter(),
+            sha256=self.filter_bar.sha256_filter(),
             order_by=self.filter_bar.order_by(),
             descending=self.filter_bar.descending(),
         )
@@ -177,18 +179,35 @@ class BrowserPanel(QWidget):
         mod_guid: str | None = None,
         author_id: int | None = None,
         plugin_guid: str | None = None,
+        sha256: str | None = None,
     ) -> None:
-        """应用关系筛选（例如详情面板点「按此 MOD 筛选」）。
+        """应用关系筛选（MOD / 作者 / 插件 / 相同 SHA-256）。
 
-        只设置传入的项；FilterBar 会发出 ``criteria_changed`` → ``reload()``，
-        因此筛选状态与查询始终一致。
+        只设置传入的项；FilterBar 会发出 ``criteria_changed`` → ``reload()``。
+        选择未变化时显式 ``reload()`` 一次，确保用户从详情发起反查也会清空旧分页。
         """
+        previous = (
+            self.filter_bar.mod_guid(),
+            self.filter_bar.author_id(),
+            self.filter_bar.plugin_guid(),
+            self.filter_bar.sha256_filter(),
+        )
         if mod_guid is not None:
             self.filter_bar.set_missing_mod(mod_guid)
         if author_id is not None:
             self.filter_bar.set_author(author_id)
         if plugin_guid is not None:
             self.filter_bar.set_plugin(plugin_guid)
+        if sha256 is not None:
+            self.filter_bar.set_sha256_filter(str(sha256))
+        current = (
+            self.filter_bar.mod_guid(),
+            self.filter_bar.author_id(),
+            self.filter_bar.plugin_guid(),
+            self.filter_bar.sha256_filter(),
+        )
+        if current == previous:
+            self.reload()
 
     # ---- 刷新（筛选 / 切换库） -------------------------------------------
 
@@ -380,6 +399,8 @@ class BrowserPanel(QWidget):
             or scope.author_id is not None
             or scope.tag_id is not None
             or scope.favorite is not None
+            or scope.has_duplicates is not None
+            or scope.sha256 is not None
         )
 
     def _update_status(self) -> None:

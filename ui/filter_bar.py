@@ -1,11 +1,11 @@
-"""中栏顶部筛选栏 —— Phase 1.4-C-2 / Phase 3.5.2。
+"""中栏顶部筛选栏 —— Phase 1.4-C-2 / Phase 3.5.2 / Phase 4.2。
 
 只负责「把用户输入变成筛选状态」，并发出一个 ``criteria_changed`` 信号；
 不查询、不排序、不判断资源类型归属——那些都属于 core（``BrowserScope`` /
 ``BrowseService``）。
 
 控件：SearchBox / ResourceTypeCombo / MissingMODCheck / NeedsReviewCheck /
-TagCombo / FavoriteCombo / SortCombo。
+TagCombo / FavoriteCombo / DuplicateCombo / SHA-256 状态 / SortCombo。
 搜索输入经过 250–300ms debounce 后才发信号。
 """
 
@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -54,7 +55,7 @@ SORT_OPTIONS: tuple[tuple[str, bool, str], ...] = (
 
 
 class FilterBar(QWidget):
-    """搜索 / 类型 / 缺 MOD / 待确认 / Tag / Favorite / 排序 的筛选栏。"""
+    """搜索 / 类型 / 关系 / 重复状态 / SHA-256 / 排序 的筛选栏。"""
 
     criteria_changed = pyqtSignal()
 
@@ -83,6 +84,19 @@ class FilterBar(QWidget):
         self.favorite_combo.addItem("全部", None)
         self.favorite_combo.addItem("仅收藏", True)
         self.favorite_combo.addItem("非收藏", False)
+
+        self.duplicates_combo = QComboBox()
+        self.duplicates_combo.addItem("全部重复状态", None)
+        self.duplicates_combo.addItem("仅重复", True)
+        self.duplicates_combo.addItem("无重复", False)
+
+        self.sha256_label = QLabel("SHA-256：全部")
+        self.sha256_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.clear_sha256_button = QPushButton("清除 SHA")
+        self.clear_sha256_button.setVisible(False)
+        self._sha256_filter: str | None = None
 
         self.sort_combo = QComboBox()
         for _order_by, _descending, label in SORT_OPTIONS:
@@ -127,11 +141,19 @@ class FilterBar(QWidget):
         row2.addWidget(QLabel("收藏"))
         row2.addWidget(self.favorite_combo)
 
+        row3 = QHBoxLayout()
+        row3.setContentsMargins(0, 0, 0, 0)
+        row3.addWidget(QLabel("重复"))
+        row3.addWidget(self.duplicates_combo)
+        row3.addWidget(self.sha256_label, 1)
+        row3.addWidget(self.clear_sha256_button)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
         layout.addLayout(row1)
         layout.addLayout(row2)
+        layout.addLayout(row3)
 
         # 填充下拉项时不要触发查询
         self._populating = False
@@ -148,6 +170,8 @@ class FilterBar(QWidget):
         self.needs_review_check.toggled.connect(self._emit_changed)
         self.tag_combo.currentIndexChanged.connect(self._emit_changed)
         self.favorite_combo.currentIndexChanged.connect(self._emit_changed)
+        self.duplicates_combo.currentIndexChanged.connect(self._emit_changed)
+        self.clear_sha256_button.clicked.connect(self.clear_sha256_filter)
         self.sort_combo.currentIndexChanged.connect(self._emit_changed)
         self.author_combo.currentIndexChanged.connect(self._emit_changed)
         self.plugin_combo.currentIndexChanged.connect(self._emit_changed)
@@ -175,6 +199,13 @@ class FilterBar(QWidget):
     def favorite_filter(self) -> bool | None:
         value = self.favorite_combo.currentData()
         return value if isinstance(value, bool) else None
+
+    def has_duplicates_filter(self) -> bool | None:
+        value = self.duplicates_combo.currentData()
+        return value if isinstance(value, bool) else None
+
+    def sha256_filter(self) -> str | None:
+        return self._sha256_filter
 
     def sort_spec(self) -> tuple[str, bool]:
         index = self.sort_combo.currentIndex()
@@ -318,6 +349,40 @@ class FilterBar(QWidget):
     def set_favorite_filter(self, favorite: bool | None) -> None:
         index = self.favorite_combo.findData(favorite)
         self.favorite_combo.setCurrentIndex(index if index >= 0 else 0)
+
+    def set_has_duplicates_filter(self, has_duplicates: bool | None) -> None:
+        index = self.duplicates_combo.findData(has_duplicates)
+        self.duplicates_combo.setCurrentIndex(index if index >= 0 else 0)
+
+    def set_sha256_filter(self, sha256: str | None) -> None:
+        """同步外部 SHA-256 筛选状态，并在值变化时触发一次刷新。"""
+        normalized = sha256.strip() if isinstance(sha256, str) else None
+        normalized = normalized or None
+        changed = normalized != self._sha256_filter
+        self._sha256_filter = normalized
+        if normalized is None:
+            self.sha256_label.setText("SHA-256：全部")
+            self.sha256_label.setToolTip("")
+        else:
+            short = (
+                normalized
+                if len(normalized) <= 12
+                else normalized[:12] + "…"
+            )
+            self.sha256_label.setText(f"SHA-256：{short}")
+            self.sha256_label.setToolTip(normalized)
+        self.clear_sha256_button.setVisible(normalized is not None)
+        if changed and not self._populating:
+            self.criteria_changed.emit()
+
+    def clear_sha256_filter(self) -> None:
+        self.set_sha256_filter(None)
+
+    def click_clear_sha256(self) -> None:
+        self.clear_sha256_button.click()
+
+    def sha256_text(self) -> str:
+        return self.sha256_label.text()
 
     def set_sort(self, order_by: str, descending: bool) -> None:
         for index, (field, desc, _label) in enumerate(SORT_OPTIONS):

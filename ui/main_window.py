@@ -182,6 +182,15 @@ class MainWindow(QMainWindow):
         self.library_panel.scan_requested.connect(self._on_scan_requested)
         self.browser_panel.resource_selected.connect(self._on_resource_selected)
         self.detail_panel.mod_filter_requested.connect(self._on_mod_filter_requested)
+        self.detail_panel.sha256_filter_requested.connect(
+            self._on_sha256_filter_requested
+        )
+        self.detail_panel.author_filter_requested.connect(
+            self._on_author_filter_requested
+        )
+        self.detail_panel.plugin_filter_requested.connect(
+            self._on_plugin_filter_requested
+        )
         self.detail_panel.tag_assign_requested.connect(self._on_tag_assign_requested)
         self.detail_panel.tag_unassign_requested.connect(
             self._on_tag_unassign_requested
@@ -265,6 +274,24 @@ class MainWindow(QMainWindow):
         if self.browser_panel is None or mod_guid is None:
             return
         self.browser_panel.apply_relation_filter(mod_guid=str(mod_guid))
+
+    def _on_sha256_filter_requested(self, sha256) -> None:
+        """详情面板点「筛选同组副本」→ 按 byte-identical 哈希反查。"""
+        if self.browser_panel is None or sha256 is None:
+            return
+        self.browser_panel.apply_relation_filter(sha256=str(sha256))
+
+    def _on_author_filter_requested(self, author_id) -> None:
+        """详情面板点击作者 → 中栏按作者 id 只读反查。"""
+        if self.browser_panel is None or author_id is None:
+            return
+        self.browser_panel.apply_relation_filter(author_id=int(author_id))
+
+    def _on_plugin_filter_requested(self, plugin_guid) -> None:
+        """详情面板点击插件 → 中栏按插件 GUID 只读反查。"""
+        if self.browser_panel is None or plugin_guid is None:
+            return
+        self.browser_panel.apply_relation_filter(plugin_guid=str(plugin_guid))
 
     # ---- Tag / Favorite / 资源字段写入（Phase 3.5.2）-------------------
 
