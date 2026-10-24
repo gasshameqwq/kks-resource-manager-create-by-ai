@@ -1,8 +1,8 @@
 # PROJECT_STATE — 项目当前状态与权威文档入口
 
 > 文档类型：**当前状态登记（CURRENT STATE）**。不是冻结契约，不是阶段报告。
-> 最后更新：2026-10-24（登记 Phase 3.5 CLI / GUI Integration 关闭结论与
-> `982 passed` 测试基线；保留 U1 / U2 开放缺口和 `resource_type` 清除接口限制）
+> 最后更新：2026-10-24（登记 Phase 4 Duplicate Detection & Resource Relations
+> 关闭结论、`1000 passed` 测试基线与 annotated tag `phase-4-closed`）
 >
 > 维护规则：
 > - 本文件只描述**当前**状态；历史结论仍以对应阶段报告为准，**不以本文件改写历史**。
@@ -31,6 +31,7 @@
 | 测试基线（Phase 3.3） | `pytest -q` → **938 passed / 0 failed / 0 skipped**（两次独立运行：`46.84 s` 与 `44.30 s`，**均为 2026-10-15 实施轮实测**）。**该结果未经后续收尾轮重新执行**，来源为实施日志 | `docs/phase3/PHASE3_3_LOG.md` §5.2 |
 | 测试基线（Phase 3.4） | `pytest -q` → **943 passed / 0 failed / 0 skipped**（2026-10-17 实施轮实测，`52.07 s`；`943 = 938 + 5` 新增用例） | `docs/phase3/PHASE3_4_LOG.md` §5.2 |
 | 测试基线（Phase 3.5） | `pytest -q` → **982 passed / 0 failed / 0 skipped**（`125.38 s`，2026-10-24 Phase 3.5.2 实施轮实测；`982 = 961 + 21` 新增用例） | `docs/phase3/PHASE3_5_2_LOG.md` §3.4 |
+| 测试基线（Phase 4） | `pytest -q` → **1000 passed / 0 failed / 0 skipped**（2026-10-24 关闭复验；`1000 = 982 + 13 + 5`） | `docs/phase4/PHASE4_CLOSURE_REPORT.md` §Verification |
 | 持久工作库 | `data/kks_resource_manager.db`：`libraries=0` / `resources=0` / `mods=0` / `tags=0` / `resource_tags=0` / `collections=0` / `duplicate_groups=0`；`schema_version='2'` | 只读打开实测 |
 | 运行环境 | Python 3.11+（实测 3.12.10）· PyQt6 / msgpack / Pillow | `requirements.txt` |
 
@@ -126,6 +127,7 @@
 | Phase 3.3 | **CLOSED / CONDITIONAL PASS**（Search & Query Foundation） | [phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md) | `phase-3.3-closed` |
 | Phase 3.4 | **CLOSED / CONDITIONAL PASS**（User Classification & Search） | [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md) | `phase-3.4-closed` |
 | Phase 3.5 | **CLOSED / CONDITIONAL PASS**（CLI / GUI Integration） | [phase3/PHASE3_5_CLOSURE_REPORT.md](./phase3/PHASE3_5_CLOSURE_REPORT.md) | —（未授权创建） |
+| Phase 4 | **CLOSED / CONDITIONAL PASS**（Duplicate Detection & Resource Relations） | [phase4/PHASE4_CLOSURE_REPORT.md](./phase4/PHASE4_CLOSURE_REPORT.md) | `phase-4-closed` |
 | Phase H2 | **CLOSED / CONDITIONAL PASS**（Git History Privacy Remediation） | [PHASE_H2_CLOSURE_REPORT.md](./PHASE_H2_CLOSURE_REPORT.md) | —（H2 未创建专用 tag） |
 
 Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplicate / 2.3 查询暴露 /
@@ -193,6 +195,7 @@ Phase 3.4 完整历史的隐私整改、候选验证与现有 GitHub 仓库发�
 | 3.4 | User Classification & Search | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-18；契约 FROZEN；tag `phase-3.4-closed`；Closure Report：[phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)） |
 | 3.5 | CLI / GUI Integration | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-24；Closure Report：[phase3/PHASE3_5_CLOSURE_REPORT.md](./phase3/PHASE3_5_CLOSURE_REPORT.md)；未授权 tag） |
 | 3.6 | （无定义） | ⚠️ **定义缺失**：仅出现在路线图记录中，全仓无任何内容定义；**不视为已批准阶段**，本文件不代为定义，也不删除该条目 |
+| 4 | Duplicate Detection & Resource Relations | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-24；契约 FROZEN；Closure Report：[phase4/PHASE4_CLOSURE_REPORT.md](./phase4/PHASE4_CLOSURE_REPORT.md)；annotated tag `phase-4-closed`） |
 
 **来源与权威级别**：3.0.2 / 3.1 / 3.2–3.5 顺序来自
 `docs/phase3/PHASE3_0_2_SEARCH_TAXONOMY_ARCHITECTURE_REVIEW.md` §11 与该文件头部记录的
@@ -260,9 +263,21 @@ Phase 3.5.2 实施提交 `9bc1938`
 仍无真实使用证据，以及 Phase 3.1 冻结契约未提供 `resource_type` 从用户修正
 恢复自动值的接口。Phase 3.5 关闭时**未创建 tag、未执行 push**。
 
-**Phase 4 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 4–6 条目来自早期路线图，
-尚未重新论证（Phase 4 的 byte-duplicate 部分已在 Phase 2 以只读派生形式完成）。
-不得把这些条目当作契约。
+**Phase 4 实施与关闭记录（事实，2026-10-24）**：Phase 4.1 实施提交
+`21ad0c2`（`feat(phase4.1): expand query model and cli for duplicate and sha256 filtering`，
+10 files / +810 / −42）交付 `ResourceFilter` 17 字段、`BrowserScope` 16 键、
+byte-duplicate / SHA-256 只读筛选、CLI 重复 / SHA / 作者筛选。
+Phase 4.2 实施提交 `37f6cab`
+（`feat(phase4.2): integrate duplicate filter, copy list and relation lookup into pyqt6 gui`，
+6 files / +697 / −9）交付 PyQt6 重复三态、同组副本路径列表、SHA-256 筛选状态，
+以及作者 / 插件反查信号闭环。
+最终全量测试为 **`1000 passed / 0 failed / 0 skipped`**。阶段结论为
+**CLOSED / CONDITIONAL PASS**，权威报告为
+[phase4/PHASE4_CLOSURE_REPORT.md](./phase4/PHASE4_CLOSURE_REPORT.md)。
+关闭提交创建 annotated tag `phase-4-closed`；该 tag **尚未推送**。
+
+**Phase 5 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 5–6 条目来自早期路线图，
+尚未重新论证，不得当作契约、批准计划或实施承诺。
 
 ---
 
@@ -325,6 +340,16 @@ Phase 3.3 契约 §2-10 排除），**不得**扩展为本阶段的实施内容�
 | U2 CLI / GUI 入口偏好 | **仍为 OPEN**：两个入口已存在，但没有首个真实入口的使用记录 |
 | `resource_type` 清除 | **受限**：Phase 3.1 冻结 Non-Goal 不提供 `type_source: user → auto`；GUI 不伪造该能力 |
 
+**Phase 4 关闭时的转记（2026-10-24，事实）**：
+
+| 项 | 关闭时状态 |
+| :--- | :--- |
+| 真实重复处理使用证据 | **OPEN**：持久工作库为空，自动化与真实样本只读查询不构成真实使用记录 |
+| GUI 人工验收 | **OPEN**：离屏自动化通过，但尚无目标 Windows 环境的人工视觉、DPI、键盘与可用性验收 |
+| 语义重复 / 感知相似度 | **不在范围**：Phase 4 只处理 SHA-256 相同的 byte-identical 资源 |
+| duplicate 持久化工作流 | **未启用**：`duplicate_groups` / `duplicate_members` 仍为零写入预留表 |
+| 性能 benchmark | **未要求**：冻结契约未要求实施 |
+
 **Phase H2 关闭时保留的证据限制（2026-10-18，仍未解决）**：
 
 1. A5 缺少 `fsck.log` 与 `fsck-unreachable.log` 原始输出；summary 中的退出码 0
@@ -348,7 +373,6 @@ Phase 3.3 契约 §2-10 排除），**不得**扩展为本阶段的实施内容�
 | 位置 | 内容 |
 | :--- | :--- |
 | `core/__init__.py` | `__phase__ = "Phase 1.5-B (Scan GUI)"`（版本字符串未随阶段更新） |
-| `core/duplicate/__init__.py` | docstring 写「Phase 4 实现」并引用 `content_key` |
 | `core/mod/__init__.py` | docstring 写「Phase 2 实现」（实际 manifest 解析在 `core/parsers/zipmod.py`） |
 
 ---
@@ -361,7 +385,10 @@ Phase 3.3 契约 §2-10 排除），**不得**扩展为本阶段的实施内容�
 - Phase 3.3 冻结 Contract（FROZEN，2026-10-13）：[phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md)
 - Phase 3.3 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-15）：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)
 - Phase 3.5 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-24）：[phase3/PHASE3_5_CLOSURE_REPORT.md](./phase3/PHASE3_5_CLOSURE_REPORT.md)
+- Phase 4 冻结 Contract（FROZEN，2026-10-24）：[phase4/PHASE4_0_CONTRACT.md](./phase4/PHASE4_0_CONTRACT.md)
+- Phase 4 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-24）：[phase4/PHASE4_CLOSURE_REPORT.md](./phase4/PHASE4_CLOSURE_REPORT.md)
 - Phase H2 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-18）：[PHASE_H2_CLOSURE_REPORT.md](./PHASE_H2_CLOSURE_REPORT.md)
+- Phase 4 实施日志：[phase4/PHASE4_1_LOG.md](./phase4/PHASE4_1_LOG.md) · [phase4/PHASE4_2_LOG.md](./phase4/PHASE4_2_LOG.md)
 - Phase 3.3 实施日志（含证据修订说明）：[phase3/PHASE3_3_LOG.md](./phase3/PHASE3_3_LOG.md)
 - Phase 3.2 实施日志（含最终状态索引）：[phase3/PHASE3_2_LOG.md](./phase3/PHASE3_2_LOG.md)
 - 证据缺口登记：[phase3/PHASE3_0_OPEN_EVIDENCE.md](./phase3/PHASE3_0_OPEN_EVIDENCE.md)

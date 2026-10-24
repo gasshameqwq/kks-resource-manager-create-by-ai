@@ -2,14 +2,14 @@
 
 > **Koikatsu Sunshine 本地资源管理器** — 本地优先、默认只读、可人工修正。
 >
-> 当前状态：**Phase 3.5（CLI / GUI Integration）已 CLOSED / CONDITIONAL PASS**
-> （2026-10-24；关闭报告见
-> [docs/phase3/PHASE3_5_CLOSURE_REPORT.md](./docs/phase3/PHASE3_5_CLOSURE_REPORT.md)；
-> 本阶段未创建 tag、未执行 push）
-> · 已封存：Phase 1 / Phase 2（`phase-2.4-closed`）/ Phase 3.0 · 3.0.2 · 3.1 · 3.2 · 3.3 · 3.4 · 3.5
-> · 后续方向：尚未定义，不构成本轮新增规划
-> · schema `v2` · Python 3.11+ · 测试基线 `982 passed`（0 failed / 0 skipped；来源
-> [docs/phase3/PHASE3_5_2_LOG.md](./docs/phase3/PHASE3_5_2_LOG.md) §3.4）
+> 当前状态：**Phase 4（Duplicate Detection & Resource Relations）已 CLOSED / CONDITIONAL PASS**
+> （2026-10-24；annotated tag `phase-4-closed`；关闭报告见
+> [docs/phase4/PHASE4_CLOSURE_REPORT.md](./docs/phase4/PHASE4_CLOSURE_REPORT.md)；
+> tag 尚未 push）
+> · 已封存：Phase 1 / Phase 2（`phase-2.4-closed`）/ Phase 3.0 · 3.0.2 · 3.1 · 3.2 · 3.3 · 3.4 · 3.5 / Phase 4（`phase-4-closed`）
+> · 后续方向：Phase 5–6 仅为早期占位，尚未批准
+> · schema `v2` · Python 3.11+ · 测试基线 `1000 passed`（0 failed / 0 skipped；来源
+> [docs/phase4/PHASE4_CLOSURE_REPORT.md](./docs/phase4/PHASE4_CLOSURE_REPORT.md) §Verification）
 >
 > 各阶段状态与权威文档入口以 [docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md) 为准。
 
@@ -112,6 +112,12 @@ Scanner 重扫不会覆盖用户值。Phase 3.5 已交付 Tag / Favorite 的 CLI
 PyQt6 GUI 筛选、打标和收藏交互；最终状态见
 [Phase 3.5 Closure Report](./docs/phase3/PHASE3_5_CLOSURE_REPORT.md)。
 
+Phase 4 已交付 byte-identical 重复筛选、SHA-256 精确反查、CLI `--author`
+筛选，以及 PyQt6 同组副本路径列表和作者 / 插件 / SHA-256 一键反查。
+只读字段与 Query Model 契约见
+[Phase 4 Contract](./docs/phase4/PHASE4_0_CONTRACT.md)，
+最终状态见 [Phase 4 Closure Report](./docs/phase4/PHASE4_CLOSURE_REPORT.md)。
+
 Phase 1.4 起 `main.py` 会挂接 PyQt6 主窗口，核心逻辑始终留在 `core/`。
 
 ```bash
@@ -150,7 +156,7 @@ kks-resource-manager/
 │   ├── parsers/          # KKS/KK 卡片解析            （Phase 1）
 │   ├── mod/              # 空壳模块（MOD manifest 实际在 parsers/zipmod.py）
 │   ├── thumbnails/       # 缩略图缓存（只写 data/thumbnail_cache/）
-│   ├── duplicate/        # 空壳模块（byte-duplicate 为 Query 层只读派生）
+│   ├── duplicate/        # byte-duplicate 只读派生说明（不持久化重复关系）
 │   └── classification/   # 识别优先级 Level 1–4
 ├── ui/                   # 界面层：只调用 core/，不含业务逻辑
 ├── tests/                # pytest：核心逻辑必须可无 UI 测试
@@ -185,7 +191,7 @@ kks-resource-manager/
 | 1 | 扫描 + KKS/KK 卡片识别 + SQLite + 只读 GUI 浏览器 | ✅ 已完成并收尾（PHASE 1 = CLOSED） |
 | 2 | MOD / 卡片解析 + Content Identity（sha256）+ Byte-duplicate（只读派生）+ 查询暴露 | ✅ 已完成并收尾（tag `phase-2.4-closed`） |
 | 3 | 用户数据 / 机器事实分离 + Tag 体系 + CLI / GUI Integration（Phase 3 首期） | ✅ 3.0 · 3.0.2 · 3.1 · 3.2 已完成（tag `phase-3.2-closed`）；**3.3 CLOSED / CONDITIONAL PASS**（tag `phase-3.3-closed`）；**3.4 CLOSED / CONDITIONAL PASS**（tag `phase-3.4-closed` 已推送）；**3.5 CLOSED / CONDITIONAL PASS（2026-10-24；未授权 tag）**；3.6 尚未定义 |
-| 4 | 重复检测 + 资源关系 | ⏳ 早期路线图占位：byte-duplicate 已在 Phase 2 完成；其余未重新论证 |
+| 4 | 重复检测 + 资源关系 | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-24；byte-identical / SHA-256 筛选 + GUI 副本与关系反查；annotated tag `phase-4-closed`，尚未 push） |
 | 5 | 批量文件操作（Preview / Confirm / Undo） | ⏳ 早期路线图占位，未论证 |
 | 6 | 性能优化 + 测试 + Windows 打包 | ⏳ 早期路线图占位，未论证 |
 
@@ -202,6 +208,13 @@ Phase 3.4 的冻结记录见
 关闭报告见 [docs/phase3/PHASE3_4_CLOSURE_REPORT.md](./docs/phase3/PHASE3_4_CLOSURE_REPORT.md)；
 Phase 3.5 关闭报告见
 [docs/phase3/PHASE3_5_CLOSURE_REPORT.md](./docs/phase3/PHASE3_5_CLOSURE_REPORT.md)。
+
+Phase 4 以 `PHASE4_0_CONTRACT.md` 的只读 byte-duplicate / SHA-256 语义为基线，
+完成 Query / CLI 与 PyQt6 闭环。阶段结论为 **CLOSED / CONDITIONAL PASS**：
+缺少真实工作库使用记录与目标 Windows 环境的人工 GUI 验收，但自动测试、只读边界、
+schema 与 Git 收尾均已满足验收要求。详见
+[docs/phase4/PHASE4_CLOSURE_REPORT.md](./docs/phase4/PHASE4_CLOSURE_REPORT.md)。
+Phase 5–6 仍仅为早期占位，不构成本轮规划或实施授权。
 
 ---
 
@@ -248,6 +261,10 @@ Phase 3.5 关闭报告见
 | [docs/phase3/PHASE3_3_CLOSURE_REPORT.md](./docs/phase3/PHASE3_3_CLOSURE_REPORT.md) | Phase 3.3 Closure（Search & Query Foundation = **CLOSED / CONDITIONAL PASS**；含开放事项与证据来源说明） |
 | [docs/phase3/PHASE3_3_LOG.md](./docs/phase3/PHASE3_3_LOG.md) | Phase 3.3 实施日志（测试记录、证据修订说明与开放事项登记） |
 | [docs/phase3/PHASE3_5_CLOSURE_REPORT.md](./docs/phase3/PHASE3_5_CLOSURE_REPORT.md) | Phase 3.5 Closure（CLI / GUI Integration = **CLOSED / CONDITIONAL PASS**；含 982 passed 基线、U1/U2 与 `resource_type` 限制） |
+| [docs/phase4/PHASE4_0_CONTRACT.md](./docs/phase4/PHASE4_0_CONTRACT.md) | Phase 4 冻结契约（**FROZEN**；byte-duplicate / SHA-256 Query Model、CLI 与边界） |
+| [docs/phase4/PHASE4_1_LOG.md](./docs/phase4/PHASE4_1_LOG.md) | Phase 4.1 实施日志（Query Model、CLI、测试与范围偏差记录） |
+| [docs/phase4/PHASE4_2_LOG.md](./docs/phase4/PHASE4_2_LOG.md) | Phase 4.2 实施日志（PyQt6 重复视图、关系反查与 GUI 测试） |
+| [docs/phase4/PHASE4_CLOSURE_REPORT.md](./docs/phase4/PHASE4_CLOSURE_REPORT.md) | Phase 4 Closure（**CLOSED / CONDITIONAL PASS**；1000 passed、条件、架构边界与 Git 证据） |
 | [docs/phase3/PHASE3_0_OPEN_EVIDENCE.md](./docs/phase3/PHASE3_0_OPEN_EVIDENCE.md) | U1–U5 证据缺口登记（**未解决**，本轮不执行取证） |
 | [docs/THIRD_PARTY.md](./docs/THIRD_PARTY.md) | 第三方来源与 License 合规 |
 
