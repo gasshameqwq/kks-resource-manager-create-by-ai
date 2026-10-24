@@ -635,7 +635,7 @@ def test_real_sample_browse_is_read_only(real_db) -> None:
 
 
 def test_scope_filters_project_model_params_exactly() -> None:
-    """``filters()`` 必须是 ``to_filter().to_params()`` 在 14 键上的**投影**。"""
+    """``filters()`` 必须是 ``to_filter().to_params()`` 在 16 键上的**投影**。"""
     scope = BrowserScope(
         query="x", tag_id=7, favorite=False, order_by="name", descending=True
     )
@@ -643,12 +643,12 @@ def test_scope_filters_project_model_params_exactly() -> None:
     filters = scope.filters()
 
     assert tuple(filters) == BrowserScope.FILTER_KEYS
-    assert len(filters) == 14
+    assert len(filters) == 16
     for key in BrowserScope.FILTER_KEYS:
         assert filters[key] == params[key], key
 
-    # 模型 15 键（含 GUI 不暴露的 card_marker）⇒ 与 filters() 必然不等。
-    assert len(params) == 15
+    # 模型 17 键（含 GUI 不暴露的 card_marker）⇒ 与 filters() 必然不等。
+    assert len(params) == 17
     assert filters != params
     assert "card_marker" not in filters
     assert params["card_marker"] is None

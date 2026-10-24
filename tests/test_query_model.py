@@ -125,18 +125,18 @@ def seeded(conn):
 
 
 # ---------------------------------------------------------------------------
-# T-A：模型是 frozen 纯值对象；默认构造 == 无任何条件；参数集恒为 15 键
+# T-A：模型是 frozen 纯值对象；默认构造 == 无任何条件；参数集恒为 17 键
 # ---------------------------------------------------------------------------
 
 
-def test_resource_filter_is_frozen_and_has_fifteen_params():
+def test_resource_filter_is_frozen_and_has_seventeen_params():
     filt = ResourceFilter()
     assert dataclasses.is_dataclass(filt)
 
     params = filt.to_params()
     field_names = {field.name for field in dataclasses.fields(ResourceFilter)}
     assert set(params) == field_names
-    assert len(params) == 15
+    assert len(params) == 17
     assert all(value is None for value in params.values())
 
     with pytest.raises(dataclasses.FrozenInstanceError):
@@ -538,6 +538,8 @@ def test_scope_filters_are_a_projection_of_model_params():
         property_category="face",
         tag_id=3,
         favorite=True,
+        has_duplicates=True,
+        sha256="  abc  ",
         order_by="name",
         descending=True,
     )
@@ -545,12 +547,12 @@ def test_scope_filters_are_a_projection_of_model_params():
     filters = scope.filters()
 
     assert tuple(filters) == BrowserScope.FILTER_KEYS
-    assert len(filters) == 14
+    assert len(filters) == 16
     for key in BrowserScope.FILTER_KEYS:
         assert filters[key] == params[key], key
 
-    # 模型 15 键（多一个 GUI 不暴露的 card_marker）⇒ 二者必然不等。
-    assert len(params) == 15
+    # 模型 17 键（多一个 GUI 不暴露的 card_marker）⇒ 二者必然不等。
+    assert len(params) == 17
     assert filters != params
     assert "card_marker" not in filters
     assert params["card_marker"] is None
@@ -563,14 +565,16 @@ def test_scope_filters_are_a_projection_of_model_params():
     # 新增键承载了值，既有键逐键保持。
     assert filters["tag_id"] == 3
     assert filters["favorite"] is True
+    assert filters["has_duplicates"] is True
+    assert filters["sha256"] == "abc"
     assert filters["query"] == "x"
     assert filters["has_missing_mods"] is True
 
 
-def test_empty_scope_filters_have_all_fourteen_keys():
+def test_empty_scope_filters_have_all_sixteen_keys():
     filters = BrowserScope().filters()
     assert tuple(filters) == BrowserScope.FILTER_KEYS
-    assert len(filters) == 14
+    assert len(filters) == 16
     assert all(value is None for value in filters.values())
 
 
@@ -579,6 +583,8 @@ def test_filter_keys_is_a_class_constant_not_a_field():
     assert "FILTER_KEYS" not in field_names
     assert "tag_id" in field_names
     assert "favorite" in field_names
+    assert "has_duplicates" in field_names
+    assert "sha256" in field_names
 
 
 def test_filters_keys_and_model_keys_are_valid_query_params():
@@ -595,9 +601,13 @@ def test_new_scope_fields_are_appended_with_defaults():
     field_names = [field.name for field in dataclasses.fields(BrowserScope)]
     assert field_names.index("tag_id") > field_names.index("property_category")
     assert field_names.index("favorite") > field_names.index("tag_id")
+    assert field_names.index("has_duplicates") > field_names.index("favorite")
+    assert field_names.index("sha256") > field_names.index("has_duplicates")
     assert field_names[-2:] == ["order_by", "descending"]
     assert BrowserScope().tag_id is None
     assert BrowserScope().favorite is None
+    assert BrowserScope().has_duplicates is None
+    assert BrowserScope().sha256 is None
 
     existing = {
         "query",
@@ -617,6 +627,8 @@ def test_new_scope_fields_are_appended_with_defaults():
     assert set(field_names) - existing == {
         "tag_id",
         "favorite",
+        "has_duplicates",
+        "sha256",
         "order_by",
         "descending",
     }

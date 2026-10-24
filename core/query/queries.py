@@ -288,6 +288,8 @@ def _resource_where(
     query: str | None,
     tag_id: int | None,
     favorite: bool | None,
+    has_duplicates: bool | None,
+    sha256: str | None,
 ) -> tuple[list[str], list[object]]:
     clauses: list[str] = []
     params: list[object] = []
@@ -379,6 +381,21 @@ def _resource_where(
             " WHERE rt.resource_id = r.id AND t.name_key = ?)"
         )
         params.append(FAVORITE_TAG_KEY)
+    if sha256 is not None:
+        clauses.append("r.sha256 = ?")
+        params.append(sha256)
+    if has_duplicates is not None:
+        # byte-duplicate 只依既有 sha256；相关 EXISTS 使用
+        # idx_resources_sha256。空哈希永不视为重复。
+        peer_exists = (
+            "EXISTS (SELECT 1 FROM resources r2"
+            " WHERE r2.sha256 = r.sha256 AND r2.id != r.id)"
+        )
+        if has_duplicates:
+            clauses.append("r.sha256 IS NOT NULL")
+            clauses.append(peer_exists)
+        else:
+            clauses.append(f"(r.sha256 IS NULL OR NOT {peer_exists})")
 
     return clauses, params
 
@@ -509,6 +526,8 @@ class ResourceQuery:
         query: str | None = None,
         tag_id: int | None = None,
         favorite: bool | None = None,
+        has_duplicates: bool | None = None,
+        sha256: str | None = None,
     ) -> int:
         clauses, params = _resource_where(
             self.conn,
@@ -527,6 +546,8 @@ class ResourceQuery:
             query=query,
             tag_id=tag_id,
             favorite=favorite,
+            has_duplicates=has_duplicates,
+            sha256=sha256,
         )
         sql = "SELECT count(*) AS c FROM resources r"
         if clauses:
@@ -552,6 +573,8 @@ class ResourceQuery:
         query: str | None = None,
         tag_id: int | None = None,
         favorite: bool | None = None,
+        has_duplicates: bool | None = None,
+        sha256: str | None = None,
         order_by: str = "id",
         descending: bool = False,
         limit: int | None = None,
@@ -585,6 +608,8 @@ class ResourceQuery:
             query=query,
             tag_id=tag_id,
             favorite=favorite,
+            has_duplicates=has_duplicates,
+            sha256=sha256,
         )
         return _resource_summary_query(
             self.conn,

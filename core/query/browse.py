@@ -73,14 +73,17 @@ class BrowserScope:
     property_category: str | None = None
     tag_id: int | None = None
     favorite: bool | None = None
+    has_duplicates: bool | None = None
+    sha256: str | None = None
     order_by: str = "id"
     descending: bool = False
 
-    #: GUI 作用域真正装配的筛选键集：既有 12 键 + Phase 3.3 新增的 ``tag_id`` / ``favorite``。
+    #: GUI 作用域真正装配的筛选键集：Phase 3.3 的 14 键 +
+    #: Phase 4.1 新增的 ``has_duplicates`` / ``sha256``。
     #:
-    #: ``ResourceQuery.count`` / ``list`` 的筛选面为 **15** 项（多一个 GUI 不暴露的
+    #: ``ResourceQuery.count`` / ``list`` 的筛选面为 **17** 项（多一个 GUI 不暴露的
     #: ``card_marker``），因此 :meth:`filters` 是本键集上的**投影**，
-    #: 与 ``to_filter().to_params()``（15 键）**必然不等** —— 不得用字典相等做断言。
+    #: 与 ``to_filter().to_params()``（17 键）**必然不等** —— 不得用字典相等做断言。
     FILTER_KEYS: ClassVar[tuple[str, ...]] = (
         "query",
         "resource_type",
@@ -96,6 +99,8 @@ class BrowserScope:
         "property_category",
         "tag_id",
         "favorite",
+        "has_duplicates",
+        "sha256",
     )
 
     def to_filter(self) -> ResourceFilter:
@@ -120,6 +125,8 @@ class BrowserScope:
             property_category=self.property_category,
             tag_id=self.tag_id,
             favorite=self.favorite,
+            has_duplicates=self.has_duplicates,
+            sha256=self.sha256,
         )
 
     def filters(self) -> dict[str, object]:
@@ -129,7 +136,7 @@ class BrowserScope:
         因此不存在「两条路径参数不一致」的可能（调用方也不需要各自拼一遍）。
 
         实现上**只做键投影**：先经 :meth:`to_filter` 完成唯一的字段值映射，
-        再按 :data:`FILTER_KEYS` 取子集。返回值**恰好**包含这 14 个键，
+        再按 :data:`FILTER_KEYS` 取子集。返回值**恰好**包含这 16 个键，
         且键恒存在、值可为 ``None``（与 ``ResourceQuery`` 的默认值语义一致）。
         """
         params = self.to_filter().to_params()

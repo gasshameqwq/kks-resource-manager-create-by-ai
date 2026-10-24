@@ -262,16 +262,23 @@ def _duplicate_group_lines(group) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _resource_list_scope(args, tag_id: int | None = None) -> dict:
+def _resource_list_scope(
+    args,
+    tag_id: int | None = None,
+    author_id: int | None = None,
+    sha256: str | None = None,
+) -> dict:
     """``query resources`` 的 JSON ``scope``：**仅**输出实际提供的筛选参数。
 
-    Phase 3.3 新增键沿用同一条「非 ``None`` 才输出」规则：
+    Phase 3.3 / 4.1 新增键沿用同一条「非 ``None`` 才输出」规则：
 
     - ``tag_id``：仅在 ``--tag`` **解析成功**时加入（``tag_id`` 由调用方传入）；
     - ``favorite``：仅在提供 ``--favorite`` / ``--no-favorite`` 时加入（``True`` / ``False``）。
+    - ``author_id``：仅在 ``--author`` **解析成功**时加入；
+    - ``has_duplicates`` / ``sha256``：仅在对应 CLI 参数产生非 ``None`` 值时加入。
 
     ``scope`` 是**对外** JSON 字段（既有契约面），不是
-    ``ResourceFilter.to_params()`` 的序列化 —— 后者恒为 15 键且允许 ``None``。
+    ``ResourceFilter.to_params()`` 的序列化 —— 后者恒为 17 键且允许 ``None``。
     """
     scope = {}
     for key, value in (
@@ -286,6 +293,9 @@ def _resource_list_scope(args, tag_id: int | None = None) -> dict:
         ("has_mods", args.has_mods),
         ("tag_id", tag_id),
         ("favorite", args.favorite),
+        ("author_id", author_id),
+        ("has_duplicates", args.has_duplicates),
+        ("sha256", sha256),
     ):
         if value is not None:
             scope[key] = value
@@ -304,16 +314,35 @@ def cmd_resources(conn, args) -> int:
             return _not_found("Tag", args.tag)
         tag_id = tag.id
 
-    # 新增筛选条件**只**经 Query Model 进入（不新增第二套条件语义）：
-    # 仅从 ``to_params()`` 取出新增的 ``tag_id`` / ``favorite`` 两项与既有参数合并。
-    # 禁止整表展开 15 键 —— 会产生重复关键字（如 ``resource_type`` 传两次），
+    # 作者解析只发生在 CLI 层：纯数字优先当作 id；否则走精确 name_key 查询。
+    # 数字 id 未命中时不回退成同名作者，确保两种输入形式语义明确。
+    author_id: int | None = None
+    if args.author is not None:
+        target = args.author.strip()
+        if target.isdigit():
+            author = AuthorQuery(conn).get(int(target))
+        else:
+            author = AuthorQuery(conn).find_by_name(target)
+        if author is None:
+            return _not_found("Author", args.author)
+        author_id = author.id
+
+    resource_filter = ResourceFilter(
+        tag_id=tag_id,
+        favorite=args.favorite,
+        author_id=author_id,
+        has_duplicates=args.has_duplicates,
+        sha256=args.sha256,
+    )
+
+    # 筛选条件**只**经 Query Model 进入（不新增第二套条件语义）：
+    # 仅从 ``to_params()`` 取出本命令新增的筛选项与既有参数合并。
+    # 禁止整表展开 17 键 —— 会产生重复关键字（如 ``resource_type`` 传两次），
     # 或用模型默认的 ``None`` 覆盖既有筛选值。
     new_params = {
         key: value
-        for key, value in ResourceFilter(
-            tag_id=tag_id, favorite=args.favorite
-        ).to_params().items()
-        if key in ("tag_id", "favorite")
+        for key, value in resource_filter.to_params().items()
+        if key in ("tag_id", "favorite", "author_id", "has_duplicates", "sha256")
     }
     rows = ResourceQuery(conn).list(
         resource_type=args.resource_type,
@@ -333,7 +362,12 @@ def cmd_resources(conn, args) -> int:
     )
     payload = {
         "count": len(rows),
-        "scope": _resource_list_scope(args, tag_id=tag_id),
+        "scope": _resource_list_scope(
+            args,
+            tag_id=tag_id,
+            author_id=author_id,
+            sha256=resource_filter.sha256,
+        ),
         "resources": [_resource_obj(r) for r in rows],
     }
     lines = [f"Resources: {len(rows)}"]
@@ -743,6 +777,28 @@ def add_query_parser(sub) -> None:
     favorite_group.add_argument(
         "--no-favorite", dest="favorite", action="store_const", const=False,
         help="只看未收藏资源",
+    )
+    duplicates_group = resources.add_mutually_exclusive_group()
+    duplicates_group.add_argument(
+        "--has-duplicates",
+        dest="has_duplicates",
+        action="store_const",
+        const=True,
+        default=None,
+        help="只看存在相同 sha256 的其他资源的 byte-duplicate 资源",
+    )
+    duplicates_group.add_argument(
+        "--no-duplicates",
+        dest="has_duplicates",
+        action="store_const",
+        const=False,
+        help="只看没有相同 sha256 的资源的非重复资源（含空哈希）",
+    )
+    resources.add_argument("--sha256", default=None, help="按完整 SHA-256 精确筛选")
+    resources.add_argument(
+        "--author",
+        default=None,
+        help="按作者 id（纯数字）或精确作者名筛选",
     )
     mods_group = resources.add_mutually_exclusive_group()
     mods_group.add_argument(
