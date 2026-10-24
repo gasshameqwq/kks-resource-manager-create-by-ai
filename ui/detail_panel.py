@@ -1,4 +1,4 @@
-"""右栏：资源详情面板 —— Phase 1.4-C-1 → C-4。
+"""右栏：资源详情面板 —— Phase 1.4-C-1 → Phase 3.5.2。
 
 结构（普通 Qt Widgets，无 MVC/MVVM、无自定义 delegate）::
 
@@ -9,6 +9,8 @@
             └── content
                 ├── Preview
                 ├── Identity（标题 / 类型 / 游戏 / 库 / 相对路径）
+                ├── Organization（Tag 展示 / 添加 / 删除 / Favorite）
+                ├── User Edit（display_name / notes / resource_type）
                 ├── Basic Info（扩展名 / 大小 / 修改时间 / 扫描 / 解析 /
                 │                内容哈希 / 字节完全相同的资源数）
                 ├── Authors
@@ -22,6 +24,8 @@
 --------
 - **不查询数据库**：详情由 MainWindow 经 ``BrowseService.detail()`` 取好后传入；
   review reason 同样由 MainWindow 传入（``BrowseService.review_reasons()``）。
+- **不直接写服务**：本面板只发出意图信号；MainWindow 负责调用
+  ``TagWriteService`` / ``ResourceWriteService`` 并刷新 Query/Browse 视图。
 - **不算哈希、不判重复**：``内容哈希`` 直接来自 ``ResourceSummary.sha256``（Phase 2.1 写入、
   Phase 2.3-A 暴露）；``字节完全相同的资源数`` 直接来自 MainWindow 传入的
   ``BrowseService.duplicate_group_for()`` 结果（``DuplicateGroup``）。本面板不做任何
@@ -42,9 +46,13 @@ from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QCheckBox,
+    QComboBox,
     QFormLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QPlainTextEdit,
     QPushButton,
@@ -56,6 +64,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from core.models import RESOURCE_TYPES
 from core.query import DuplicateGroup, ResourceDetail, ReviewReason
 from core.thumbnails import (
     PREVIEW_FAILED as CORE_FAILED,
@@ -97,6 +106,8 @@ METADATA_READABLE_KEYS: tuple[str, ...] = (
 _MISSING_MARK = "缺失"
 _INSTALLED_MARK = "已安装"
 _MISSING_COLOR = QColor(176, 0, 32)
+_TAG_ID_ROLE = int(Qt.ItemDataRole.UserRole)
+_TAG_SYSTEM_ROLE = _TAG_ID_ROLE + 1
 
 
 def format_file_size(size: int | None) -> str:
@@ -161,10 +172,17 @@ class _Section(QGroupBox):
 
 
 class DetailPanel(QWidget):
-    """只读资源详情面板。"""
+    """资源详情与用户编辑意图面板。"""
 
     #: 用户在 MOD 依赖表里点「按此 MOD 筛选」时发出（payload = mod guid）。
     mod_filter_requested = pyqtSignal(object)
+    tag_assign_requested = pyqtSignal(int, int)
+    tag_unassign_requested = pyqtSignal(int, int)
+    tag_create_requested = pyqtSignal(int, str)
+    favorite_change_requested = pyqtSignal(int, bool)
+    display_name_save_requested = pyqtSignal(int, object)
+    notes_save_requested = pyqtSignal(int, object)
+    resource_type_save_requested = pyqtSignal(int, str)
 
     def __init__(self, preview_service=None, parent=None) -> None:
         super().__init__(parent)
@@ -177,6 +195,7 @@ class DetailPanel(QWidget):
         self._current_detail: ResourceDetail | None = None
         self._current_reasons: tuple[ReviewReason, ...] = ()
         self._usage_summary: dict[str, int] = {}
+        self._available_tags = ()
 
         self._sections: dict[str, _Section] = {}
         self._build_ui()
@@ -199,6 +218,8 @@ class DetailPanel(QWidget):
 
         self._build_preview_section()
         self._build_identity_section()
+        self._build_management_section()
+        self._build_user_edit_section()
         self._build_basic_section()
         self._build_authors_section()
         self._build_mods_section()
@@ -236,6 +257,122 @@ class DetailPanel(QWidget):
         self.basic_section = self._add_section("basic", "基本信息", expanded=True)
         self._basic_layout = QFormLayout()
         self.basic_section.set_content_layout(self._basic_layout)
+
+    def _build_management_section(self) -> None:
+        self.management_section = self._add_section(
+            "management", "标签与收藏", expanded=True
+        )
+        self.tag_list = QListWidget()
+        self.tag_list.setMaximumHeight(120)
+        self.tag_list.itemSelectionChanged.connect(self._update_remove_tag_button)
+
+        self.remove_tag_button = QPushButton("移除所选标签")
+        self.remove_tag_button.setEnabled(False)
+        self.remove_tag_button.clicked.connect(self._on_remove_tag_clicked)
+
+        self.existing_tag_combo = QComboBox()
+        self.existing_tag_combo.setMinimumWidth(150)
+        self.existing_tag_combo.currentIndexChanged.connect(
+            self._update_add_existing_tag_button
+        )
+        self.add_existing_tag_button = QPushButton("添加已有标签")
+        self.add_existing_tag_button.setEnabled(False)
+        self.add_existing_tag_button.clicked.connect(
+            self._on_add_existing_tag_clicked
+        )
+        existing_row = QHBoxLayout()
+        existing_row.setContentsMargins(0, 0, 0, 0)
+        existing_row.addWidget(self.existing_tag_combo, 1)
+        existing_row.addWidget(self.add_existing_tag_button)
+
+        self.new_tag_edit = QLineEdit()
+        self.new_tag_edit.setPlaceholderText("新标签名称")
+        self.new_tag_edit.textChanged.connect(self._update_create_tag_button)
+        self.create_tag_button = QPushButton("新建并添加")
+        self.create_tag_button.setEnabled(False)
+        self.create_tag_button.clicked.connect(self._on_create_tag_clicked)
+        create_row = QHBoxLayout()
+        create_row.setContentsMargins(0, 0, 0, 0)
+        create_row.addWidget(self.new_tag_edit, 1)
+        create_row.addWidget(self.create_tag_button)
+
+        self.favorite_check = QCheckBox("收藏（Favorite）")
+        self.favorite_check.toggled.connect(self._on_favorite_toggled)
+        self.write_feedback = QLabel("")
+        self.write_feedback.setWordWrap(True)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.tag_list)
+        layout.addWidget(self.remove_tag_button)
+        layout.addLayout(existing_row)
+        layout.addLayout(create_row)
+        layout.addWidget(self.favorite_check)
+        layout.addWidget(self.write_feedback)
+        self.management_section.set_content_layout(layout)
+
+    def _build_user_edit_section(self) -> None:
+        self.user_edit_section = self._add_section(
+            "user_edit", "用户编辑", expanded=True
+        )
+        form = QFormLayout()
+
+        self.display_name_edit = QLineEdit()
+        self.display_name_save_button = QPushButton("保存")
+        self.display_name_clear_button = QPushButton("清除覆盖")
+        self.display_name_save_button.clicked.connect(
+            self._on_save_display_name
+        )
+        self.display_name_clear_button.clicked.connect(
+            self._on_clear_display_name
+        )
+        display_row = QWidget()
+        display_layout = QHBoxLayout(display_row)
+        display_layout.setContentsMargins(0, 0, 0, 0)
+        display_layout.addWidget(self.display_name_edit, 1)
+        display_layout.addWidget(self.display_name_save_button)
+        display_layout.addWidget(self.display_name_clear_button)
+        form.addRow("展示名：", display_row)
+
+        self.notes_edit = QPlainTextEdit()
+        self.notes_edit.setMaximumHeight(90)
+        self.notes_save_button = QPushButton("保存备注")
+        self.notes_clear_button = QPushButton("清除备注")
+        self.notes_save_button.clicked.connect(self._on_save_notes)
+        self.notes_clear_button.clicked.connect(self._on_clear_notes)
+        notes_buttons = QHBoxLayout()
+        notes_buttons.setContentsMargins(0, 0, 0, 0)
+        notes_buttons.addWidget(self.notes_save_button)
+        notes_buttons.addWidget(self.notes_clear_button)
+        notes_buttons.addStretch(1)
+        notes_row = QWidget()
+        notes_layout = QVBoxLayout(notes_row)
+        notes_layout.setContentsMargins(0, 0, 0, 0)
+        notes_layout.addWidget(self.notes_edit)
+        notes_layout.addLayout(notes_buttons)
+        form.addRow("备注：", notes_row)
+
+        self.resource_type_combo = QComboBox()
+        for resource_type in RESOURCE_TYPES:
+            self.resource_type_combo.addItem(resource_type, resource_type)
+        self.resource_type_save_button = QPushButton("保存类型修正")
+        self.resource_type_save_button.clicked.connect(
+            self._on_save_resource_type
+        )
+        type_row = QWidget()
+        type_layout = QHBoxLayout(type_row)
+        type_layout.setContentsMargins(0, 0, 0, 0)
+        type_layout.addWidget(self.resource_type_combo, 1)
+        type_layout.addWidget(self.resource_type_save_button)
+        form.addRow("资源类型：", type_row)
+
+        self.type_source_label = QLabel("类型来源：-")
+        self.type_source_label.setWordWrap(True)
+        self.type_source_label.setToolTip(
+            "Phase 3.1 冻结契约不提供从用户修正恢复自动类型的 API；"
+            "因此只支持保存修正，不伪造“清除”。"
+        )
+        form.addRow("类型来源：", self.type_source_label)
+        self.user_edit_section.set_content_layout(form)
 
     def _build_authors_section(self) -> None:
         self.authors_section = self._add_section("authors", "作者", expanded=True)
@@ -330,6 +467,12 @@ class DetailPanel(QWidget):
         self._current_detail = None
         self._current_reasons = ()
         self._current_duplicate_group = None
+        self.write_feedback.setText("")
+        self.tag_list.clear()
+        self.existing_tag_combo.clear()
+        self.existing_tag_combo.addItem("选择已有标签", None)
+        self.new_tag_edit.clear()
+        self._set_favorite_checked(False)
         self._status_label.setText(EMPTY_TEXT)
         self._stack.setCurrentIndex(0)
 
@@ -338,6 +481,7 @@ class DetailPanel(QWidget):
         self._current_detail = None
         self._current_reasons = ()
         self._current_duplicate_group = None
+        self.write_feedback.setText("")
         self._status_label.setText(f"找不到资源 #{int(resource_id)}")
         self._stack.setCurrentIndex(0)
 
@@ -345,6 +489,7 @@ class DetailPanel(QWidget):
         self._current_detail = None
         self._current_reasons = ()
         self._current_duplicate_group = None
+        self.write_feedback.setText("")
         self._status_label.setText(f"读取详情失败：{text}")
         self._stack.setCurrentIndex(0)
 
@@ -378,7 +523,10 @@ class DetailPanel(QWidget):
         self._current_reasons = tuple(review_reasons or ())
         self._current_duplicate_group = duplicate_group
 
+        self.write_feedback.setText("")
         self._render_identity(detail, library_name)
+        self._render_management(detail)
+        self._render_user_edit(detail)
         self._render_basic(detail, duplicate_group)
         self._render_authors(detail)
         self._render_mods(detail)
@@ -389,6 +537,157 @@ class DetailPanel(QWidget):
         self._schedule_preview(detail.resource)
 
         self._stack.setCurrentIndex(1)
+
+    def set_available_tags(self, tags) -> None:
+        """由 MainWindow 传入 Query Layer 读取的 Tag 目录。"""
+        self._available_tags = tuple(tags or ())
+        self._refresh_tag_choices()
+
+    def show_operation_message(self, text: str, *, error: bool = False) -> None:
+        """显示一次写操作反馈；不改变详情中的持久状态。"""
+        self.write_feedback.setText(text)
+        self.write_feedback.setProperty("error", bool(error))
+        self.write_feedback.style().unpolish(self.write_feedback)
+        self.write_feedback.style().polish(self.write_feedback)
+
+    def _render_management(self, detail: ResourceDetail) -> None:
+        self.tag_list.clear()
+        self.new_tag_edit.clear()
+        for tag in detail.tags:
+            suffix = " [系统]" if tag.is_system else ""
+            item_text = f"{tag.name}{suffix}"
+            self.tag_list.addItem(item_text)
+            item = self.tag_list.item(self.tag_list.count() - 1)
+            if item is not None:
+                item.setData(_TAG_ID_ROLE, int(tag.id))
+                item.setData(_TAG_SYSTEM_ROLE, bool(tag.is_system))
+        self._set_favorite_checked(bool(detail.is_favorite))
+        self._refresh_tag_choices()
+        self._update_remove_tag_button()
+        self._update_create_tag_button()
+
+    def _render_user_edit(self, detail: ResourceDetail) -> None:
+        resource = detail.resource
+        self.display_name_edit.setText(resource.display_name or "")
+        self.display_name_edit.setPlaceholderText(
+            f"留空则回退到：{resource.name or resource.title}"
+        )
+        self.notes_edit.setPlainText(resource.notes or "")
+
+        index = self.resource_type_combo.findData(resource.resource_type)
+        if index >= 0:
+            self.resource_type_combo.setCurrentIndex(index)
+        source_label = (
+            "用户修正"
+            if resource.type_source == "user"
+            else "自动识别"
+        )
+        self.type_source_label.setText(f"{source_label}（type_source={resource.type_source}）")
+
+    def _refresh_tag_choices(self) -> None:
+        selected = self.existing_tag_combo.currentData()
+        assigned = {
+            int(tag.id)
+            for tag in (self._current_detail.tags if self._current_detail else ())
+        }
+        self.existing_tag_combo.blockSignals(True)
+        try:
+            self.existing_tag_combo.clear()
+            self.existing_tag_combo.addItem("选择已有标签", None)
+            for tag in self._available_tags:
+                if tag.is_system or int(tag.id) in assigned:
+                    continue
+                self.existing_tag_combo.addItem(tag.name, int(tag.id))
+            index = self.existing_tag_combo.findData(selected)
+            self.existing_tag_combo.setCurrentIndex(index if index >= 0 else 0)
+        finally:
+            self.existing_tag_combo.blockSignals(False)
+        self._update_add_existing_tag_button()
+
+    def _set_favorite_checked(self, checked: bool) -> None:
+        self.favorite_check.blockSignals(True)
+        try:
+            self.favorite_check.setChecked(bool(checked))
+        finally:
+            self.favorite_check.blockSignals(False)
+
+    def _on_add_existing_tag_clicked(self) -> None:
+        tag_id = self.existing_tag_combo.currentData()
+        if self._current_resource_id is not None and tag_id is not None:
+            self.tag_assign_requested.emit(
+                int(self._current_resource_id), int(tag_id)
+            )
+
+    def _on_remove_tag_clicked(self) -> None:
+        item = self.tag_list.currentItem()
+        if self._current_resource_id is None or item is None:
+            return
+        if bool(item.data(_TAG_SYSTEM_ROLE)):
+            return
+        tag_id = item.data(_TAG_ID_ROLE)
+        if tag_id is not None:
+            self.tag_unassign_requested.emit(
+                int(self._current_resource_id), int(tag_id)
+            )
+
+    def _on_create_tag_clicked(self) -> None:
+        name = self.new_tag_edit.text().strip()
+        if self._current_resource_id is not None and name:
+            self.tag_create_requested.emit(int(self._current_resource_id), name)
+
+    def _on_favorite_toggled(self, checked: bool) -> None:
+        if self._current_resource_id is not None:
+            self.favorite_change_requested.emit(
+                int(self._current_resource_id), bool(checked)
+            )
+
+    def _on_save_display_name(self) -> None:
+        if self._current_resource_id is not None:
+            self.display_name_save_requested.emit(
+                int(self._current_resource_id),
+                self.display_name_edit.text(),
+            )
+
+    def _on_clear_display_name(self) -> None:
+        if self._current_resource_id is not None:
+            self.display_name_save_requested.emit(
+                int(self._current_resource_id), None
+            )
+
+    def _on_save_notes(self) -> None:
+        if self._current_resource_id is not None:
+            self.notes_save_requested.emit(
+                int(self._current_resource_id), self.notes_edit.toPlainText()
+            )
+
+    def _on_clear_notes(self) -> None:
+        if self._current_resource_id is not None:
+            self.notes_save_requested.emit(int(self._current_resource_id), None)
+
+    def _on_save_resource_type(self) -> None:
+        value = self.resource_type_combo.currentData()
+        if self._current_resource_id is not None and value is not None:
+            self.resource_type_save_requested.emit(
+                int(self._current_resource_id), str(value)
+            )
+
+    def _update_add_existing_tag_button(self, *_args) -> None:
+        self.add_existing_tag_button.setEnabled(
+            self.existing_tag_combo.currentData() is not None
+        )
+
+    def _update_create_tag_button(self, *_args) -> None:
+        self.create_tag_button.setEnabled(
+            bool(self.new_tag_edit.text().strip())
+            and self._current_resource_id is not None
+        )
+
+    def _update_remove_tag_button(self) -> None:
+        item = self.tag_list.currentItem()
+        self.remove_tag_button.setEnabled(
+            item is not None
+            and not bool(item.data(_TAG_SYSTEM_ROLE))
+        )
 
     # ---- 渲染：各区域 ----------------------------------------------------
 
@@ -685,6 +984,92 @@ class DetailPanel(QWidget):
 
     def detail(self) -> ResourceDetail | None:
         return self._current_detail
+
+    def tag_rows(self) -> list[tuple[int, str, bool]]:
+        rows: list[tuple[int, str, bool]] = []
+        for index in range(self.tag_list.count()):
+            item = self.tag_list.item(index)
+            rows.append(
+                (
+                    int(item.data(_TAG_ID_ROLE)),
+                    item.text(),
+                    bool(item.data(_TAG_SYSTEM_ROLE)),
+                )
+            )
+        return rows
+
+    def available_tag_ids(self) -> list[int]:
+        return [
+            int(self.existing_tag_combo.itemData(index))
+            for index in range(self.existing_tag_combo.count())
+            if self.existing_tag_combo.itemData(index) is not None
+        ]
+
+    def display_name_value(self) -> str:
+        return self.display_name_edit.text()
+
+    def notes_value(self) -> str:
+        return self.notes_edit.toPlainText()
+
+    def resource_type_value(self) -> str | None:
+        value = self.resource_type_combo.currentData()
+        return str(value) if value is not None else None
+
+    def is_favorite_checked(self) -> bool:
+        return self.favorite_check.isChecked()
+
+    def operation_feedback(self) -> str:
+        return self.write_feedback.text()
+
+    def set_display_name_value(self, value: str) -> None:
+        self.display_name_edit.setText(value)
+
+    def set_notes_value(self, value: str) -> None:
+        self.notes_edit.setPlainText(value)
+
+    def set_resource_type_value(self, value: str) -> None:
+        index = self.resource_type_combo.findData(value)
+        if index >= 0:
+            self.resource_type_combo.setCurrentIndex(index)
+
+    def set_new_tag_name(self, value: str) -> None:
+        self.new_tag_edit.setText(value)
+
+    def select_tag_to_add(self, tag_id: int) -> None:
+        index = self.existing_tag_combo.findData(int(tag_id))
+        if index >= 0:
+            self.existing_tag_combo.setCurrentIndex(index)
+
+    def click_add_existing_tag(self) -> None:
+        self.add_existing_tag_button.click()
+
+    def click_create_tag(self) -> None:
+        self.create_tag_button.click()
+
+    def select_tag_row(self, row: int) -> None:
+        if 0 <= row < self.tag_list.count():
+            self.tag_list.setCurrentRow(row)
+
+    def click_remove_tag(self) -> None:
+        self.remove_tag_button.click()
+
+    def click_save_display_name(self) -> None:
+        self.display_name_save_button.click()
+
+    def click_clear_display_name(self) -> None:
+        self.display_name_clear_button.click()
+
+    def click_save_notes(self) -> None:
+        self.notes_save_button.click()
+
+    def click_clear_notes(self) -> None:
+        self.notes_clear_button.click()
+
+    def click_save_resource_type(self) -> None:
+        self.resource_type_save_button.click()
+
+    def click_favorite(self) -> None:
+        self.favorite_check.click()
 
     def review_reasons(self) -> tuple[ReviewReason, ...]:
         return self._current_reasons

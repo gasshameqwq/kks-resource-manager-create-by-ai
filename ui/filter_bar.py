@@ -1,10 +1,11 @@
-"""中栏顶部筛选栏 —— Phase 1.4-C-2。
+"""中栏顶部筛选栏 —— Phase 1.4-C-2 / Phase 3.5.2。
 
 只负责「把用户输入变成筛选状态」，并发出一个 ``criteria_changed`` 信号；
 不查询、不排序、不判断资源类型归属——那些都属于 core（``BrowserScope`` /
 ``BrowseService``）。
 
-控件：SearchBox / ResourceTypeCombo / MissingMODCheck / NeedsReviewCheck / SortCombo。
+控件：SearchBox / ResourceTypeCombo / MissingMODCheck / NeedsReviewCheck /
+TagCombo / FavoriteCombo / SortCombo。
 搜索输入经过 250–300ms debounce 后才发信号。
 """
 
@@ -53,7 +54,7 @@ SORT_OPTIONS: tuple[tuple[str, bool, str], ...] = (
 
 
 class FilterBar(QWidget):
-    """搜索 / 类型 / 缺 MOD / 待确认 / 排序 的筛选栏。"""
+    """搜索 / 类型 / 缺 MOD / 待确认 / Tag / Favorite / 排序 的筛选栏。"""
 
     criteria_changed = pyqtSignal()
 
@@ -73,6 +74,15 @@ class FilterBar(QWidget):
 
         self.missing_check = QCheckBox("只看缺 MOD")
         self.needs_review_check = QCheckBox("待确认")
+
+        self.tag_combo = QComboBox()
+        self.tag_combo.addItem("全部标签", None)
+        self.tag_combo.setMinimumWidth(150)
+
+        self.favorite_combo = QComboBox()
+        self.favorite_combo.addItem("全部", None)
+        self.favorite_combo.addItem("仅收藏", True)
+        self.favorite_combo.addItem("非收藏", False)
 
         self.sort_combo = QComboBox()
         for _order_by, _descending, label in SORT_OPTIONS:
@@ -112,6 +122,10 @@ class FilterBar(QWidget):
         row2.addWidget(self.plugin_combo)
         row2.addWidget(QLabel("MOD"))
         row2.addWidget(self.mod_combo, 1)
+        row2.addWidget(QLabel("标签"))
+        row2.addWidget(self.tag_combo)
+        row2.addWidget(QLabel("收藏"))
+        row2.addWidget(self.favorite_combo)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -132,6 +146,8 @@ class FilterBar(QWidget):
         self.type_combo.currentIndexChanged.connect(self._emit_changed)
         self.missing_check.toggled.connect(self._emit_changed)
         self.needs_review_check.toggled.connect(self._emit_changed)
+        self.tag_combo.currentIndexChanged.connect(self._emit_changed)
+        self.favorite_combo.currentIndexChanged.connect(self._emit_changed)
         self.sort_combo.currentIndexChanged.connect(self._emit_changed)
         self.author_combo.currentIndexChanged.connect(self._emit_changed)
         self.plugin_combo.currentIndexChanged.connect(self._emit_changed)
@@ -151,6 +167,14 @@ class FilterBar(QWidget):
 
     def needs_review(self) -> bool | None:
         return True if self.needs_review_check.isChecked() else None
+
+    def tag_id(self) -> int | None:
+        value = self.tag_combo.currentData()
+        return int(value) if value is not None else None
+
+    def favorite_filter(self) -> bool | None:
+        value = self.favorite_combo.currentData()
+        return value if isinstance(value, bool) else None
 
     def sort_spec(self) -> tuple[str, bool]:
         index = self.sort_combo.currentIndex()
@@ -206,6 +230,23 @@ class FilterBar(QWidget):
             for mod in sorted(missing_mods, key=lambda m: (-m.used_by_count, m.guid)):
                 self.mod_combo.addItem(f"{mod.guid}（{mod.used_by_count}）", mod.guid)
             self.mod_combo.setEditText("")
+        finally:
+            self._populating = False
+
+    def set_tag_options(self, tags) -> None:
+        """重建 Tag 下拉；保留仍存在的当前选择，且不主动触发查询。"""
+        selected = self.tag_id()
+        self._populating = True
+        try:
+            self.tag_combo.clear()
+            self.tag_combo.addItem("全部标签", None)
+            for tag in tags:
+                self.tag_combo.addItem(
+                    f"{tag.name}（{tag.resource_count}）",
+                    int(tag.id),
+                )
+            index = self.tag_combo.findData(selected)
+            self.tag_combo.setCurrentIndex(index if index >= 0 else 0)
         finally:
             self._populating = False
 
@@ -269,6 +310,14 @@ class FilterBar(QWidget):
 
     def set_needs_review(self, checked: bool) -> None:
         self.needs_review_check.setChecked(bool(checked))
+
+    def set_tag(self, tag_id: int | None) -> None:
+        index = self.tag_combo.findData(tag_id)
+        self.tag_combo.setCurrentIndex(index if index >= 0 else 0)
+
+    def set_favorite_filter(self, favorite: bool | None) -> None:
+        index = self.favorite_combo.findData(favorite)
+        self.favorite_combo.setCurrentIndex(index if index >= 0 else 0)
 
     def set_sort(self, order_by: str, descending: bool) -> None:
         for index, (field, desc, _label) in enumerate(SORT_OPTIONS):

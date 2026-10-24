@@ -120,6 +120,7 @@ class BrowserPanel(QWidget):
         self._load_more_button.clicked.connect(self.load_more)
 
         self.reload_relation_options()
+        self.reload_tag_options()
         self._show_message(NO_LIBRARY_TEXT)
 
     # ---- 状态 → scope ---------------------------------------------------
@@ -135,6 +136,8 @@ class BrowserPanel(QWidget):
             mod_guid=self.filter_bar.mod_guid(),
             plugin_guid=self.filter_bar.plugin_guid(),
             author_id=self.filter_bar.author_id(),
+            tag_id=self.filter_bar.tag_id(),
+            favorite=self.filter_bar.favorite_filter(),
             order_by=self.filter_bar.order_by(),
             descending=self.filter_bar.descending(),
         )
@@ -159,6 +162,14 @@ class BrowserPanel(QWidget):
         self.filter_bar.set_relation_options(
             authors=authors, plugins=plugins, missing_mods=missing_mods
         )
+
+    def reload_tag_options(self) -> None:
+        """用 BrowseService 的只读 Tag 列表填充筛选下拉。"""
+        try:
+            tags = self._service.tags()
+        except Exception:  # noqa: BLE001 - Tag 选项加载失败不应阻塞浏览
+            return
+        self.filter_bar.set_tag_options(tags)
 
     def apply_relation_filter(
         self,
@@ -367,6 +378,8 @@ class BrowserPanel(QWidget):
             or scope.mod_guid is not None
             or scope.plugin_guid is not None
             or scope.author_id is not None
+            or scope.tag_id is not None
+            or scope.favorite is not None
         )
 
     def _update_status(self) -> None:
@@ -410,6 +423,15 @@ class BrowserPanel(QWidget):
         index = self.model.index(row, 0)
         if index.isValid():
             self.view.setCurrentIndex(index)
+
+    def select_resource(self, resource_id: int) -> bool:
+        """选中当前结果页中的资源；不存在时返回 ``False``。"""
+        wanted = int(resource_id)
+        for row, item in enumerate(self.model.items()):
+            if item.resource.id == wanted:
+                self.select_row(row)
+                return True
+        return False
 
     def _on_current_changed(self, current, _previous) -> None:
         self.resource_selected.emit(self.model.resource_id_at(current))

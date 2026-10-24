@@ -36,7 +36,13 @@ from PyQt6.QtWidgets import (
     QSplitter,
 )
 
-from core.app import LibraryAdminService
+from core.app import (
+    LibraryAdminService,
+    ResourceWriteError,
+    ResourceWriteService,
+    TagWriteError,
+    TagWriteService,
+)
 from core.scanner import RESULT_SKIPPED, SCAN_COMPLETED
 from ui.browser_panel import BrowserPanel
 from ui.detail_panel import DetailPanel
@@ -103,6 +109,8 @@ class MainWindow(QMainWindow):
         browse_service=None,
         preview_service=None,
         admin_service=None,
+        tag_write_service=None,
+        resource_write_service=None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -129,6 +137,8 @@ class MainWindow(QMainWindow):
         self._service = service
         self._preview_service = preview_service
         self._admin_service = admin_service
+        self._tag_write_service = tag_write_service
+        self._resource_write_service = resource_write_service
 
         if self._startup_error is not None:
             self.setCentralWidget(self._build_error_widget(self._startup_error))
@@ -138,6 +148,13 @@ class MainWindow(QMainWindow):
             from core.thumbnails import PreviewService
 
             self._preview_service = PreviewService()
+
+        conn = getattr(self._service, "conn", None)
+        if conn is not None:
+            if self._tag_write_service is None:
+                self._tag_write_service = TagWriteService(conn)
+            if self._resource_write_service is None:
+                self._resource_write_service = ResourceWriteService(conn)
 
         self._build_ui()
 
@@ -165,9 +182,29 @@ class MainWindow(QMainWindow):
         self.library_panel.scan_requested.connect(self._on_scan_requested)
         self.browser_panel.resource_selected.connect(self._on_resource_selected)
         self.detail_panel.mod_filter_requested.connect(self._on_mod_filter_requested)
+        self.detail_panel.tag_assign_requested.connect(self._on_tag_assign_requested)
+        self.detail_panel.tag_unassign_requested.connect(
+            self._on_tag_unassign_requested
+        )
+        self.detail_panel.tag_create_requested.connect(
+            self._on_tag_create_requested
+        )
+        self.detail_panel.favorite_change_requested.connect(
+            self._on_favorite_change_requested
+        )
+        self.detail_panel.display_name_save_requested.connect(
+            self._on_display_name_save_requested
+        )
+        self.detail_panel.notes_save_requested.connect(
+            self._on_notes_save_requested
+        )
+        self.detail_panel.resource_type_save_requested.connect(
+            self._on_resource_type_save_requested
+        )
 
         # 首次加载：LibraryPanel 构造时已选中默认库，这里同步启动中栏。
         self.detail_panel.show_empty()
+        self.detail_panel.set_available_tags(self._service.tags())
         self._on_library_selected(self.library_panel.current_library_id())
 
     def _build_error_widget(self, message: str) -> QLabel:
@@ -198,9 +235,11 @@ class MainWindow(QMainWindow):
             duplicate_group = (
                 self._service.duplicate_group_for(rid) if detail is not None else None
             )
+            tags = self._service.tags()
         except Exception as exc:  # noqa: BLE001 - 单次查询失败不影响界面
             self.detail_panel.show_error(f"{type(exc).__name__}: {exc}")
             return
+        self.detail_panel.set_available_tags(tags)
         self.detail_panel.show_detail(
             detail,
             rid,
@@ -226,6 +265,149 @@ class MainWindow(QMainWindow):
         if self.browser_panel is None or mod_guid is None:
             return
         self.browser_panel.apply_relation_filter(mod_guid=str(mod_guid))
+
+    # ---- Tag / Favorite / 资源字段写入（Phase 3.5.2）-------------------
+
+    def tag_write_service(self):
+        return self._tag_write_service
+
+    def resource_write_service(self):
+        return self._resource_write_service
+
+    def _on_tag_assign_requested(self, resource_id, tag_id) -> None:
+        if self._tag_write_service is None:
+            self._show_write_error(resource_id, "TagWriteService 不可用")
+            return
+        self._perform_ui_write(
+            resource_id,
+            lambda: self._tag_write_service.assign_tag(
+                int(resource_id), int(tag_id)
+            ),
+            "已添加标签",
+        )
+
+    def _on_tag_unassign_requested(self, resource_id, tag_id) -> None:
+        if self._tag_write_service is None:
+            self._show_write_error(resource_id, "TagWriteService 不可用")
+            return
+        self._perform_ui_write(
+            resource_id,
+            lambda: self._tag_write_service.unassign_tag(
+                int(resource_id), int(tag_id)
+            ),
+            "已移除标签",
+        )
+
+    def _on_tag_create_requested(self, resource_id, name) -> None:
+        if self._tag_write_service is None:
+            self._show_write_error(resource_id, "TagWriteService 不可用")
+            return
+
+        def create_and_assign() -> None:
+            tag_id = self._tag_write_service.create_tag(str(name))
+            self._tag_write_service.assign_tag(int(resource_id), tag_id)
+
+        self._perform_ui_write(
+            resource_id,
+            create_and_assign,
+            f"已创建并添加标签：{name}",
+        )
+
+    def _on_favorite_change_requested(self, resource_id, favorite) -> None:
+        if self._tag_write_service is None:
+            self._show_write_error(resource_id, "TagWriteService 不可用")
+            return
+        action = "收藏" if favorite else "取消收藏"
+        self._perform_ui_write(
+            resource_id,
+            lambda: self._tag_write_service.set_favorite(
+                int(resource_id), bool(favorite)
+            ),
+            f"已{action}",
+        )
+
+    def _on_display_name_save_requested(self, resource_id, value) -> None:
+        if self._resource_write_service is None:
+            self._show_write_error(resource_id, "ResourceWriteService 不可用")
+            return
+        message = "已清除展示名覆盖" if value is None else "已保存展示名覆盖"
+        self._perform_ui_write(
+            resource_id,
+            lambda: self._resource_write_service.set_display_name(
+                int(resource_id), value
+            ),
+            message,
+        )
+
+    def _on_notes_save_requested(self, resource_id, value) -> None:
+        if self._resource_write_service is None:
+            self._show_write_error(resource_id, "ResourceWriteService 不可用")
+            return
+        message = "已清除备注" if value is None else "已保存备注"
+        self._perform_ui_write(
+            resource_id,
+            lambda: self._resource_write_service.set_notes(
+                int(resource_id), value
+            ),
+            message,
+        )
+
+    def _on_resource_type_save_requested(self, resource_id, value) -> None:
+        if self._resource_write_service is None:
+            self._show_write_error(resource_id, "ResourceWriteService 不可用")
+            return
+        self._perform_ui_write(
+            resource_id,
+            lambda: self._resource_write_service.set_resource_type(
+                int(resource_id), str(value)
+            ),
+            f"已保存资源类型修正：{value}",
+        )
+
+    def _perform_ui_write(self, resource_id, action, success_message: str) -> bool:
+        """执行一次服务写入，再从 Query/Browse 层重建视图。"""
+        try:
+            action()
+        except (TagWriteError, ResourceWriteError) as exc:
+            self._refresh_after_ui_write(int(resource_id))
+            self._show_write_error(resource_id, str(exc))
+            return False
+        except Exception as exc:  # noqa: BLE001 - 单次写失败不影响窗口
+            self._refresh_after_ui_write(int(resource_id))
+            self._show_write_error(
+                resource_id, f"{type(exc).__name__}: {exc}"
+            )
+            return False
+
+        self._refresh_after_ui_write(int(resource_id))
+        if (
+            self.detail_panel is not None
+            and self.detail_panel.current_resource_id() == int(resource_id)
+        ):
+            self.detail_panel.show_operation_message(success_message)
+        return True
+
+    def _show_write_error(self, resource_id, message: str) -> None:
+        if self.detail_panel is None:
+            return
+        text = f"写入失败：{message}"
+        if self.detail_panel.current_resource_id() == int(resource_id):
+            self.detail_panel.show_operation_message(text, error=True)
+        else:
+            self.detail_panel.show_error(text)
+
+    def _refresh_after_ui_write(self, resource_id: int) -> None:
+        """刷新 Tag 选项与筛选结果；资源仍匹配时恢复详情选择。"""
+        if self.browser_panel is None or self.detail_panel is None:
+            return
+        self.browser_panel.reload_tag_options()
+        self.detail_panel.set_available_tags(self._service.tags())
+        self.browser_panel.reload()
+        if not self.browser_panel.select_resource(resource_id):
+            self.detail_panel.show_empty()
+            return
+        if self.detail_panel.current_resource_id() != resource_id:
+            self._on_resource_selected(resource_id)
 
     # ---- 扫描（Phase 1.5-B） --------------------------------------------
 
@@ -392,10 +574,20 @@ class MainWindow(QMainWindow):
 
 
 def create_main_window(
-    browse_service=None, preview_service=None, admin_service=None
+    browse_service=None,
+    preview_service=None,
+    admin_service=None,
+    tag_write_service=None,
+    resource_write_service=None,
 ) -> MainWindow:
     """创建主窗口；``browse_service`` 为空时按项目既有机制打开数据库。"""
-    return MainWindow(browse_service, preview_service, admin_service)
+    return MainWindow(
+        browse_service,
+        preview_service,
+        admin_service,
+        tag_write_service,
+        resource_write_service,
+    )
 
 
 def run_gui(argv: list[str] | None = None) -> int:
