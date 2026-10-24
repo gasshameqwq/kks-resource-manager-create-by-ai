@@ -1,9 +1,8 @@
 # PROJECT_STATE — 项目当前状态与权威文档入口
 
 > 文档类型：**当前状态登记（CURRENT STATE）**。不是冻结契约，不是阶段报告。
-> 最后更新：2026-10-21（补充 Phase 3.4 的 H2 前后 Git 对象对照、证据强度与限制；
-> 记录 Gemini 接替规划与独立技术审核后的当前协作职责模型；不改变阶段结论、
-> 冻结契约或未解决事项）
+> 最后更新：2026-10-24（登记 Phase 3.5 CLI / GUI Integration 关闭结论与
+> `982 passed` 测试基线；保留 U1 / U2 开放缺口和 `resource_type` 清除接口限制）
 >
 > 维护规则：
 > - 本文件只描述**当前**状态；历史结论仍以对应阶段报告为准，**不以本文件改写历史**。
@@ -31,6 +30,7 @@
 | 测试基线 | `pytest -q` → **883 passed / 0 failed / 0 skipped**（两次独立运行：治理前只读基线复跑 52.2 s，2026-10-10；文档改动后复核 44.55 s，2026-10-10。两者不是同一次测试，且都不是 2026-10-11 的测量） | 分两次实测 |
 | 测试基线（Phase 3.3） | `pytest -q` → **938 passed / 0 failed / 0 skipped**（两次独立运行：`46.84 s` 与 `44.30 s`，**均为 2026-10-15 实施轮实测**）。**该结果未经后续收尾轮重新执行**，来源为实施日志 | `docs/phase3/PHASE3_3_LOG.md` §5.2 |
 | 测试基线（Phase 3.4） | `pytest -q` → **943 passed / 0 failed / 0 skipped**（2026-10-17 实施轮实测，`52.07 s`；`943 = 938 + 5` 新增用例） | `docs/phase3/PHASE3_4_LOG.md` §5.2 |
+| 测试基线（Phase 3.5） | `pytest -q` → **982 passed / 0 failed / 0 skipped**（`125.38 s`，2026-10-24 Phase 3.5.2 实施轮实测；`982 = 961 + 21` 新增用例） | `docs/phase3/PHASE3_5_2_LOG.md` §3.4 |
 | 持久工作库 | `data/kks_resource_manager.db`：`libraries=0` / `resources=0` / `mods=0` / `tags=0` / `resource_tags=0` / `collections=0` / `duplicate_groups=0`；`schema_version='2'` | 只读打开实测 |
 | 运行环境 | Python 3.11+（实测 3.12.10）· PyQt6 / msgpack / Pillow | `requirements.txt` |
 
@@ -125,6 +125,7 @@
 | Phase 3.2 | CLOSED / PASS（Tag System） | [phase3/PHASE3_2_CLOSURE_REPORT.md](./phase3/PHASE3_2_CLOSURE_REPORT.md) | `phase-3.2-closed` |
 | Phase 3.3 | **CLOSED / CONDITIONAL PASS**（Search & Query Foundation） | [phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md) | `phase-3.3-closed` |
 | Phase 3.4 | **CLOSED / CONDITIONAL PASS**（User Classification & Search） | [phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md) | `phase-3.4-closed` |
+| Phase 3.5 | **CLOSED / CONDITIONAL PASS**（CLI / GUI Integration） | [phase3/PHASE3_5_CLOSURE_REPORT.md](./phase3/PHASE3_5_CLOSURE_REPORT.md) | —（未授权创建） |
 | Phase H2 | **CLOSED / CONDITIONAL PASS**（Git History Privacy Remediation） | [PHASE_H2_CLOSURE_REPORT.md](./PHASE_H2_CLOSURE_REPORT.md) | —（H2 未创建专用 tag） |
 
 Phase 2 内部划分（2.0 设计基线 / 2.1 Content Identity / 2.2 Byte-duplicate / 2.3 查询暴露 /
@@ -190,7 +191,7 @@ Phase 3.4 完整历史的隐私整改、候选验证与现有 GitHub 仓库发�
 | 3.2 | Tag System | ✅ 已完成（CLOSED / PASS） |
 | 3.3 | Search & Query Foundation | ✅ 已完成（**CLOSED / CONDITIONAL PASS**，2026-10-15；tag `phase-3.3-closed`；Closure Report：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)） |
 | 3.4 | User Classification & Search | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-18；契约 FROZEN；tag `phase-3.4-closed`；Closure Report：[phase3/PHASE3_4_CLOSURE_REPORT.md](./phase3/PHASE3_4_CLOSURE_REPORT.md)） |
-| 3.5 | CLI / GUI Integration | ⏳ **待规划方向**（未开始、未冻结） |
+| 3.5 | CLI / GUI Integration | ✅ **CLOSED / CONDITIONAL PASS**（2026-10-24；Closure Report：[phase3/PHASE3_5_CLOSURE_REPORT.md](./phase3/PHASE3_5_CLOSURE_REPORT.md)；未授权 tag） |
 | 3.6 | （无定义） | ⚠️ **定义缺失**：仅出现在路线图记录中，全仓无任何内容定义；**不视为已批准阶段**，本文件不代为定义，也不删除该条目 |
 
 **来源与权威级别**：3.0.2 / 3.1 / 3.2–3.5 顺序来自
@@ -198,7 +199,7 @@ Phase 3.4 完整历史的隐私整改、候选验证与现有 GitHub 仓库发�
 「P3.0.1 路线图」，并由 `docs/phase3/PHASE3_2_LOG.md` §1 沿用。
 该来源属**审查级记录**（非 Contract、非冻结）；3.1 / 3.2 已是**事实**，3.3 与 3.4 均已有**冻结契约**
 （3.3 的能力范围来自 `PHASE3_0_CONTRACT.md` §12-6 与用户批准的 Option B；3.4 见下方冻结与实施记录），
-3.5 及以后仅为方向。
+3.5 已完成收尾；3.6 及以后仍未定义，不构成本轮新增规划。
 
 **Phase 3.3 冻结记录（事实）**：权威契约为
 [phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md)，
@@ -247,6 +248,17 @@ G-3 的提交前核验、focused/全量测试、implementation commit、文档�
 **阶段已于 2026-10-18 CLOSED / CONDITIONAL PASS**；非阻断事项（T-A2 断言独立性、
 r6→冻结差异未独立验证）见 Closure Report。Phase 3.3 冻结段落中的过时当前状态描述
 已在 2026-10-18 的关闭后文档维护中修正；该项不再作为未解决漂移。
+
+**Phase 3.5 实施与关闭记录（事实，2026-10-24）**：Phase 3.5.1 实施提交
+`96c7fab`（`feat(phase3.5.1): add cli tag commands and eager bootstrap`，
+4 files / +951 / −1）交付 8 个 CLI 命令与 System-Tag Eager Bootstrap；
+Phase 3.5.2 实施提交 `9bc1938`
+（`feat(phase3.5.2): integrate tag and favorite controls into pyqt6 gui`，
+7 files / +1567 / −8）交付 Tag / Favorite 筛选、详情交互与用户字段编辑。
+最终全量测试为 **`982 passed / 0 failed / 0 skipped`**（`125.38 s`），只读护栏
+`8 passed`。阶段结论为 **CLOSED / CONDITIONAL PASS**；非阻断事项为 U1 / U2
+仍无真实使用证据，以及 Phase 3.1 冻结契约未提供 `resource_type` 从用户修正
+恢复自动值的接口。Phase 3.5 关闭时**未创建 tag、未执行 push**。
 
 **Phase 4 及以后**：`README.md` / `docs/ARCHITECTURE.md` 中的 Phase 4–6 条目来自早期路线图，
 尚未重新论证（Phase 4 的 byte-duplicate 部分已在 Phase 2 以只读派生形式完成）。
@@ -305,6 +317,14 @@ U1 / U3 / U4 / U5 **均无真实使用证据**；U2 仅有实现进度（Phase 3
 上游 `PHASE3_0_CONTRACT.md` §14.3 的 U4 / U5 属**上游登记项**，不属 Phase 3.3 范围（其关联能力已被
 Phase 3.3 契约 §2-10 排除），**不得**扩展为本阶段的实施内容或验收条件。
 
+**Phase 3.5 关闭时的转记（2026-10-24，事实）**：
+
+| 项 | 关闭时状态 |
+| :--- | :--- |
+| U1 真实组织需求与标签粒度 | **仍为 OPEN**：CLI / GUI 入口已交付不等于取得真实打标会话与粒度证据 |
+| U2 CLI / GUI 入口偏好 | **仍为 OPEN**：两个入口已存在，但没有首个真实入口的使用记录 |
+| `resource_type` 清除 | **受限**：Phase 3.1 冻结 Non-Goal 不提供 `type_source: user → auto`；GUI 不伪造该能力 |
+
 **Phase H2 关闭时保留的证据限制（2026-10-18，仍未解决）**：
 
 1. A5 缺少 `fsck.log` 与 `fsck-unreachable.log` 原始输出；summary 中的退出码 0
@@ -340,6 +360,7 @@ Phase 3.3 契约 §2-10 排除），**不得**扩展为本阶段的实施内容�
 - Phase 3 首期冻结 Contract：[phase3/PHASE3_0_CONTRACT.md](./phase3/PHASE3_0_CONTRACT.md)
 - Phase 3.3 冻结 Contract（FROZEN，2026-10-13）：[phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md](./phase3/PHASE3_3_IMPLEMENTATION_CONTRACT.md)
 - Phase 3.3 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-15）：[phase3/PHASE3_3_CLOSURE_REPORT.md](./phase3/PHASE3_3_CLOSURE_REPORT.md)
+- Phase 3.5 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-24）：[phase3/PHASE3_5_CLOSURE_REPORT.md](./phase3/PHASE3_5_CLOSURE_REPORT.md)
 - Phase H2 Closure Report（**CLOSED / CONDITIONAL PASS**，2026-10-18）：[PHASE_H2_CLOSURE_REPORT.md](./PHASE_H2_CLOSURE_REPORT.md)
 - Phase 3.3 实施日志（含证据修订说明）：[phase3/PHASE3_3_LOG.md](./phase3/PHASE3_3_LOG.md)
 - Phase 3.2 实施日志（含最终状态索引）：[phase3/PHASE3_2_LOG.md](./phase3/PHASE3_2_LOG.md)
